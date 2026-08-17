@@ -1,5 +1,5 @@
-from lib_common.neopixelmanager import NeoPixelManager, Pulse, Solid
-from lib_common.rotary import Rotary, RotaryEvent
+from utils.neopixelmanager import NeoPixelManager, Pulse, Solid
+from utils.rotary import Rotary, RotaryEvent
 from control_button import ControlButton, ControlAction
 from tm1637 import TM1637
 

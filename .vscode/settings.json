@@ -13,9 +13,9 @@
     "python.analysis.extraPaths": [
         "~/.micropico-stubs/included",
         "/Users/paolo/Library/Python/3.10/lib/python/site-packages",
-        "${workspaceFolder}/include/micropython-lib/micropython/usb/usb-device-midi",
-        "${workspaceFolder}/include/micropython-tm1637",
-        "${workspaceFolder}/include/micropython-utils"
+        "${workspaceFolder}/lib/micropython-lib/micropython/usb/usb-device-midi",
+        "${workspaceFolder}/lib/micropython-tm1637",
+        "${workspaceFolder}/lib/micropython-utils"
     ],
     "python-envs.defaultEnvManager": "ms-python.python:system"
 }

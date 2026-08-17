@@ -7,9 +7,9 @@ mpremote fs cp -r lib_common :/lib
 
 from machine import Pin
 from micropython import const
-from lib_common.button import Button, ButtonEvent
-from lib_common.rotary import Rotary, RotaryEvent
-from lib_common.neopixelmanager import NeoPixelManager, Pulse, Solid, Off
+from utils.button import Button, ButtonEvent
+from utils.rotary import Rotary, RotaryEvent
+from utils.neopixelmanager import NeoPixelManager, Pulse, Solid, Off
 import time
 from tm1637 import TM1637
 from patch_manager import PatchManager

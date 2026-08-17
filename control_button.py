@@ -1,5 +1,5 @@
-from lib_common.button import Button, ButtonEvent
-from lib_common.neopixelmanager import Pattern, Off, Pulse, Solid
+from utils.button import Button, ButtonEvent
+from utils.neopixelmanager import Pattern, Off, Pulse, Solid
 
 
 class ControlAction:
