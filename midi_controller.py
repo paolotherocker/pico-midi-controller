@@ -4,7 +4,7 @@ from control_button import ControlButton, ControlAction
 from tm1637 import TM1637
 
 
-class PatchManager:
+class MidiController:
     """Manages the control buttons, LEDs and the rotary encoder to generate MIDI messages"""
 
     _PATCH_MAP = [" ", "A", "B", "C", "D", "E", "F", "G", "H"]
