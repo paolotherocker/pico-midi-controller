@@ -6,14 +6,12 @@ mpremote fs cp -r lib_common :/lib
 """
 
 from machine import Pin
-from micropython import const
-from utils.button import Button, ButtonEvent
-from utils.rotary import Rotary, RotaryEvent
+from utils.rotary import Rotary
 from utils.neopixelmanager import NeoPixelManager, Pulse, Solid, Off
 import time
 from tm1637 import TM1637
 from patch_manager import PatchManager
-from control_button import ControlButton, ControlAction, LEDMode, ColorMap
+from control_button import ControlButton, ControlAction, LEDMode, PatternMap
 
 # Display
 p_disp_dio = 2
@@ -38,7 +36,7 @@ controls_mapping = [
     [ControlAction.SNAP_7_8, ControlAction.PRESET_DOWN, LEDMode.SNAP],
 ]
 
-snap_color_map = ColorMap(
+snap_pattern_map = PatternMap(
     Pulse(color1=(0, 200, 32), color2=(0, 200, 96), period_ms=5000),
     Pulse(color1=(0, 32, 200), color2=(0, 96, 200), period_ms=5000),
     Solid(color=(0, 50, 8)),
@@ -54,7 +52,7 @@ for i in range(4):
             action_short=controls_mapping[i][0],
             action_long=controls_mapping[i][1],
             led_mode=controls_mapping[i][2],
-            color_map=snap_color_map,
+            pattern_map=snap_pattern_map,
         )
     )
 

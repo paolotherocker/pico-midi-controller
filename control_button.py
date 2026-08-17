@@ -1,5 +1,5 @@
 from utils.button import Button, ButtonEvent
-from utils.neopixelmanager import Pattern, Off, Pulse, Solid
+from utils.neopixelmanager import Pattern, Off
 
 
 class ControlAction:
@@ -17,14 +17,14 @@ class LEDMode:
     SNAP = 1
 
 
-class ColorMap:
+class PatternMap:
 
     def __init__(
         self,
-        active_primary: tuple = (0, 0, 0),
-        active_secondary: tuple = (0, 0, 0),
-        passive_primary: tuple = (0, 0, 0),
-        passive_secondary: tuple = (0, 0, 0),
+        active_primary: Pattern = Off(),
+        active_secondary: Pattern = Off(),
+        passive_primary: Pattern = Off(),
+        passive_secondary: Pattern = Off(),
     ):
         self.active_primary = active_primary
         self.active_secondary = active_secondary
@@ -42,14 +42,14 @@ class ControlButton(Button):
         led_mode: LEDMode,
         debounce_ms: int = 100,
         long_press_ms: int = 600,
-        color_map: ColorMap = ColorMap(),
+        pattern_map: PatternMap = PatternMap(),
     ):
         super().__init__(pin, debounce_ms=debounce_ms, long_press_ms=long_press_ms)
         self.id = id
         self.action_short = action_short
         self.action_long = action_long
         self.led_mode = led_mode
-        self.color_map = color_map
+        self.pattern_map = pattern_map
 
         self._active = False
         self._secondary = 0
@@ -61,9 +61,9 @@ class ControlButton(Button):
 
         if self.led_mode == LEDMode.SNAP:
             if self._secondary == 0:
-                self._pattern = self.color_map.passive_primary
+                self._pattern = self.pattern_map.passive_primary
             else:
-                self._pattern = self.color_map.passive_secondary
+                self._pattern = self.pattern_map.passive_secondary
 
     def pattern(self) -> Pattern:
         if self.led_mode == LEDMode.NONE:
@@ -99,9 +99,9 @@ class ControlButton(Button):
 
             if self.led_mode == LEDMode.SNAP:
                 if self._secondary == 0:
-                    self._pattern = self.color_map.active_primary
+                    self._pattern = self.pattern_map.active_primary
                 else:
-                    self._pattern = self.color_map.active_secondary
+                    self._pattern = self.pattern_map.active_secondary
 
     def update(self) -> ControlAction:
         event = self.consume()
