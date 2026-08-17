@@ -40,7 +40,7 @@ class ControlButton(Button):
         action_short: ControlAction,
         action_long: ControlAction,
         led_mode: LEDMode,
-        debounce_ms: int = 100,
+        debounce_ms: int = 10,
         long_press_ms: int = 600,
         pattern_map: PatternMap = PatternMap(),
     ):
