@@ -6,7 +6,7 @@ from tm1637 import TM1637
 from collections import deque
 import time
 
-MIDI_INTERVAL_MS = 100
+MIDI_INTERVAL_MS = 200
 
 
 class MidiMap:
@@ -124,7 +124,6 @@ class MidiController:
         now = time.ticks_ms()
         if time.ticks_diff(now, self.msg_time) > MIDI_INTERVAL_MS:
             if len(self.msg_queue) > 0:
+                self.msg_time = now
                 msg: Message = self.msg_queue.popleft()
                 print(*msg.to_bytes())
-
-            self.msg_time = now
