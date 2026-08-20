@@ -13,36 +13,38 @@ from tm1637 import TM1637
 from midi_controller import MidiController, MidiMap
 from control_button import ControlButton, ControlAction, LEDMode, PatternMap
 
-# Display
-p_disp_dio = 2
-p_disp_clk = 3
-# Neopixel
-p_np = 15  # Data pin
-k_np_strip_len = 8  # Number of leds per strip
-k_np_strip_num = 4  # Number of strips
-# Control pins
-p_controls = [10, 11, 12, 13]
-# Encoder pins
-p_rotary_clk = 16
-p_rotary_dt = 17
-p_rotary_sw = 18
-# Extra button pins
-p_menu_buttons = [19, 20]
+UPDATE_INTERVAL = 5
 
-midi_map = MidiMap(
+# Display
+P_DISP_DIO = 2
+P_DISP_CLK = 3
+# Neopixel
+P_NP = 15  # Data pin
+NP_STRIP_LEN = 8  # Number of leds per strip
+NP_STRIP_NUM = 4  # Number of strips
+# Control pins
+P_CONTROLS = [10, 11, 12, 13]
+# Encoder pins
+P_ROTARY_CLK = 16
+P_ROTARY_DT = 17
+P_ROTARY_SW = 18
+# Extra button pins
+P_MENU_BUTTONS = [19, 20]
+
+MIDI_MAP = MidiMap(
     channel=0, snap_cc=24, preset_cc=20, preset_up_val=1, preset_down_val=2
 )
 
-controls_mapping = [
+CONTROLS_MAP = [
     [ControlAction.SNAP_1_2, ControlAction.NONE, LEDMode.SNAP],
     [ControlAction.SNAP_3_4, ControlAction.NONE, LEDMode.SNAP],
     [ControlAction.SNAP_5_6, ControlAction.PRESET_UP, LEDMode.SNAP],
     [ControlAction.SNAP_7_8, ControlAction.PRESET_DOWN, LEDMode.SNAP],
 ]
 
-snap_pattern_map = PatternMap(
-    Pulse(color1=(0, 80, 0), color2=(0, 80, 10), period_ms=5000),
-    Pulse(color1=(0, 0, 80), color2=(0, 10, 80), period_ms=5000),
+SNAP_PATTERN_MAP = PatternMap(
+    Pulse(color1=(0, 80, 0), color2=(0, 60, 20), period_ms=5000),
+    Pulse(color1=(0, 0, 80), color2=(0, 20, 60), period_ms=5000),
     Solid(color=(0, 10, 0)),
     Solid(color=(0, 0, 10)),
 )
@@ -52,30 +54,30 @@ for i in range(4):
     controls.append(
         ControlButton(
             id=i,
-            pin=p_controls[i],
-            action_short=controls_mapping[i][0],
-            action_long=controls_mapping[i][1],
-            led_mode=controls_mapping[i][2],
-            pattern_map=snap_pattern_map,
+            pin=P_CONTROLS[i],
+            action_short=CONTROLS_MAP[i][0],
+            action_long=CONTROLS_MAP[i][1],
+            led_mode=CONTROLS_MAP[i][2],
+            pattern_map=SNAP_PATTERN_MAP,
         )
     )
 
 
-encoder = Rotary(dt_pin=p_rotary_dt, clk_pin=p_rotary_clk)
-tm = TM1637(clk=Pin(p_disp_clk), dio=Pin(p_disp_dio))
+encoder = Rotary(dt_pin=P_ROTARY_DT, clk_pin=P_ROTARY_CLK)
+tm = TM1637(clk=Pin(P_DISP_CLK), dio=Pin(P_DISP_DIO))
 
-np_array = NeoPixelManager(pin_id=p_np, n=k_np_strip_len * k_np_strip_num)
-for i in range(k_np_strip_num):
-    np_array.add_subset(k_np_strip_len)
+np_array = NeoPixelManager(pin_id=P_NP, n=NP_STRIP_LEN * NP_STRIP_NUM)
+for i in range(NP_STRIP_NUM):
+    np_array.add_subset(NP_STRIP_LEN)
 
 midi_controller = MidiController(
     control_buttons=controls,
     np=np_array,
     encoder=encoder,
     display=tm,
-    midi_map=midi_map,
+    midi_map=MIDI_MAP,
 )
 
 while True:
     midi_controller.update()
-    time.sleep_ms(5)
+    time.sleep_ms(UPDATE_INTERVAL)
