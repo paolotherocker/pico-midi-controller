@@ -10,6 +10,12 @@ MIDI_INTERVAL_MS = 200
 
 
 class MidiMap:
+    CHANNEL: int
+    SNAP_CC: int
+    PRESET_CC: int
+    PRESET_UP_VAL: int
+    PRESET_DOWN_VAL: int
+
     def __init__(
         self,
         channel: int,
@@ -39,6 +45,16 @@ class MidiController:
         midi_map: MidiMap,
         preset_num: int = 8,
     ):
+        """Build Midi Controller object. Only pass pre-allocated and initialised o.bjects
+
+        Args:
+            control_buttons (list[ControlButton]): list of ControlButton objects
+            np (NeoPixelManager): Neo pixel array manager
+            encoder (Rotary): Rotary encoder
+            display (TM1637): TM1637 display manager
+            midi_map (MidiMap): Midi map with pre-set values
+            preset_num (int, optional): Maximum number of presets. Defaults to 8.
+        """
         self.control_buttons = control_buttons
         self.np = np
         self.encoder = encoder
@@ -63,9 +79,8 @@ class MidiController:
         elif self.preset > self.preset_num:
             self.preset = 1
 
-    def refresh_display(self):
-        buffer = " " + self._PATCH_MAP[self.preset] + " " + str(self.snap)
-        self.display.show(buffer)
+    def _refresh_display(self):
+        self.display.show(f" {self._PATCH_MAP[self.preset]} {self.snap}")
 
     def _snap_msg(self) -> ControlChange:
         return ControlChange(
@@ -82,11 +97,9 @@ class MidiController:
         )
 
     def update(self):
-        action_id = -1
         action = ControlAction.NONE
 
-        for ctrl in self.control_buttons:
-            action_id = action_id + 1
+        for idx, ctrl in enumerate(self.control_buttons):
             action = ctrl.update()
 
             if action in (
@@ -97,11 +110,10 @@ class MidiController:
             ):
                 self.np.set_pattern(pattern=ctrl.pattern(), id=ctrl.id)
                 self.snap = ctrl.snap_value()
-
                 self.msg_queue.append(self._snap_msg())
 
                 for c_other in self.control_buttons:
-                    if c_other.id != action_id:
+                    if c_other.id != idx:
                         c_other.set_passive()
                         self.np.set_pattern(pattern=c_other.pattern(), id=c_other.id)
 
@@ -116,8 +128,7 @@ class MidiController:
                 self.msg_queue.append(self._snap_msg())
 
             if action != ControlAction.NONE:
-                self.refresh_display()
-                break
+                self._refresh_display()
 
         self.np.poll()
 
