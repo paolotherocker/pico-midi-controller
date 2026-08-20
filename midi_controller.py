@@ -1,7 +1,20 @@
-from utils.neopixelmanager import NeoPixelManager, Pulse, Solid
-from utils.rotary import Rotary, RotaryEvent
+from utils.neopixelmanager import NeoPixelManager
+from utils.rotary import Rotary
+from utils.midimessages import Message, ControlChange
 from control_button import ControlButton, ControlAction
 from tm1637 import TM1637
+from collections import deque
+import time
+
+MIDI_INTERVAL_MS = 100
+
+
+class MidiMap:
+    CHANNEL: int = 0
+    SNAP_CC: int = 24
+    PRESET_CC: int = 20
+    PRESET_UP_VAL: int = 1
+    PRESET_DOWN_VAL: int = 2
 
 
 class MidiController:
@@ -16,20 +29,24 @@ class MidiController:
         encoder: Rotary,
         display: TM1637,
         preset_num: int = 8,
+        midi_map: MidiMap = MidiMap(),
     ):
         self.control_buttons = control_buttons
         self.np = np
         self.encoder = encoder
         self.display = display
         self.preset_num = preset_num
+        self.midi_map = midi_map
 
         self.preset: int = 1
         self.snap: int = 0
+        self.msg_queue = deque((), 25)
+        self.msg_time: int = 0
 
         self.display.brightness(3)
         self.display.show("")
 
-    def preset_update(self, delta: int):
+    def _preset_update(self, delta: int):
         self.preset += delta
 
         # Wrap around 1 and the maximum
@@ -41,6 +58,20 @@ class MidiController:
     def refresh_display(self):
         buffer = " " + self._PATCH_MAP[self.preset] + " " + str(self.snap)
         self.display.show(buffer)
+
+    def _snap_msg(self) -> ControlChange:
+        return ControlChange(
+            channel=self.midi_map.CHANNEL,
+            controller=self.midi_map.SNAP_CC,
+            value=self.snap,
+        )
+
+    def _preset_msg(self, value: int):
+        return ControlChange(
+            channel=self.midi_map.CHANNEL,
+            controller=self.midi_map.PRESET_CC,
+            value=value,
+        )
 
     def update(self):
         action_id = -1
@@ -59,18 +90,33 @@ class MidiController:
                 self.np.set_pattern(pattern=ctrl.pattern(), id=ctrl.id)
                 self.snap = ctrl.snap_value()
 
+                self.msg_queue.append(self._snap_msg())
+
                 for c_other in self.control_buttons:
                     if c_other.id != action_id:
                         c_other.set_passive()
                         self.np.set_pattern(pattern=c_other.pattern(), id=c_other.id)
 
             elif action == ControlAction.PRESET_UP:
-                self.preset_update(1)
+                self._preset_update(1)
+                self.msg_queue.append(self._preset_msg(self.midi_map.PRESET_UP_VAL))
+                self.msg_queue.append(self._snap_msg())
+
             elif action == ControlAction.PRESET_DOWN:
-                self.preset_update(-1)
+                self._preset_update(-1)
+                self.msg_queue.append(self._preset_msg(self.midi_map.PRESET_DOWN_VAL))
+                self.msg_queue.append(self._snap_msg())
 
             if action != ControlAction.NONE:
                 self.refresh_display()
                 break
 
         self.np.poll()
+
+        now = time.ticks_ms()
+        if time.ticks_diff(now, self.msg_time) > MIDI_INTERVAL_MS:
+            if len(self.msg_queue) > 0:
+                msg: Message = self.msg_queue.popleft()
+                print(*msg.to_bytes())
+
+            self.msg_time = now
