@@ -10,7 +10,7 @@ from utils.rotary import Rotary
 from utils.neopixelmanager import NeoPixelManager, Pulse, Solid, Off
 import time
 from tm1637 import TM1637
-from midi_controller import MidiController
+from midi_controller import MidiController, MidiMap
 from control_button import ControlButton, ControlAction, LEDMode, PatternMap
 
 # Display
@@ -28,6 +28,10 @@ p_rotary_dt = 17
 p_rotary_sw = 18
 # Extra button pins
 p_menu_buttons = [19, 20]
+
+midi_map = MidiMap(
+    channel=0, snap_cc=24, preset_cc=20, preset_up_val=1, preset_down_val=2
+)
 
 controls_mapping = [
     [ControlAction.SNAP_1_2, ControlAction.NONE, LEDMode.SNAP],
@@ -64,10 +68,14 @@ np_array = NeoPixelManager(pin_id=p_np, n=k_np_strip_len * k_np_strip_num)
 for i in range(k_np_strip_num):
     np_array.add_subset(k_np_strip_len)
 
-patch_manager = MidiController(
-    control_buttons=controls, np=np_array, encoder=encoder, display=tm
+midi_controller = MidiController(
+    control_buttons=controls,
+    np=np_array,
+    encoder=encoder,
+    display=tm,
+    midi_map=midi_map,
 )
 
 while True:
-    patch_manager.update()
+    midi_controller.update()
     time.sleep_ms(5)

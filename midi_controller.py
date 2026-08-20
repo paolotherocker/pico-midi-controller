@@ -10,11 +10,19 @@ MIDI_INTERVAL_MS = 100
 
 
 class MidiMap:
-    CHANNEL: int = 0
-    SNAP_CC: int = 24
-    PRESET_CC: int = 20
-    PRESET_UP_VAL: int = 1
-    PRESET_DOWN_VAL: int = 2
+    def __init__(
+        self,
+        channel: int,
+        snap_cc: int,
+        preset_cc: int,
+        preset_up_val: int,
+        preset_down_val: int,
+    ):
+        self.CHANNEL = channel
+        self.SNAP_CC = snap_cc
+        self.PRESET_CC = preset_cc
+        self.PRESET_UP_VAL = preset_up_val
+        self.PRESET_DOWN_VAL = preset_down_val
 
 
 class MidiController:
@@ -28,8 +36,8 @@ class MidiController:
         np: NeoPixelManager,
         encoder: Rotary,
         display: TM1637,
+        midi_map: MidiMap,
         preset_num: int = 8,
-        midi_map: MidiMap = MidiMap(),
     ):
         self.control_buttons = control_buttons
         self.np = np
