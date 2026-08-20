@@ -37,10 +37,10 @@ controls_mapping = [
 ]
 
 snap_pattern_map = PatternMap(
-    Pulse(color1=(0, 200, 32), color2=(0, 200, 96), period_ms=5000),
-    Pulse(color1=(0, 32, 200), color2=(0, 96, 200), period_ms=5000),
-    Solid(color=(0, 50, 8)),
-    Solid(color=(0, 8, 50)),
+    Pulse(color1=(0, 80, 0), color2=(0, 80, 10), period_ms=5000),
+    Pulse(color1=(0, 0, 80), color2=(0, 10, 80), period_ms=5000),
+    Solid(color=(0, 10, 0)),
+    Solid(color=(0, 0, 10)),
 )
 
 controls = []
