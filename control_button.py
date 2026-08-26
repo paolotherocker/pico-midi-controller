@@ -109,6 +109,8 @@ class ControlButton(Button):
             if control_action == ControlAction.SNAP_7_8:
                 self._snap_value = 7 + self._secondary
 
+        self._update_pattern()
+
     def update(self) -> ControlAction:
         event = self.consume()
         action = ControlAction.NONE
@@ -121,6 +123,5 @@ class ControlButton(Button):
             action = self.action_long
 
         self.exec_action(action)
-        self._update_pattern()
 
         return action
