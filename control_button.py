@@ -54,27 +54,21 @@ class ControlButton(Button):
         self.action_short = action_short
         self.action_long = action_long
         self.led_mode = led_mode
-        self.pattern_map = pattern_map
+
+        self.pattern_snap = (
+            (pattern_map.snap_passive_0, pattern_map.snap_passive_1),
+            (pattern_map.snap_active_0, pattern_map.snap_active_1),
+        )
+        self.pattern_hold = pattern_map.hold
 
         self._active = False
-        self._secondary = 0
+        self._secondary = False
         self._pattern = Off()
         self._snap_value = 0
 
     def _update_pattern(self):
         if self.led_mode == LEDMode.SNAP:
-            # Primary
-            if self._secondary == 0:
-                if self._active == True:
-                    self._pattern = self.pattern_map.snap_active_0
-                else:
-                    self._pattern = self.pattern_map.snap_passive_0
-            # Secondary
-            else:
-                if self._active == True:
-                    self._pattern = self.pattern_map.snap_active_1
-                else:
-                    self._pattern = self.pattern_map.snap_passive_1
+            self._pattern = self.pattern_snap[self._active][self._secondary]
 
     def set_passive(self):
         self._active = False
@@ -94,7 +88,7 @@ class ControlButton(Button):
             return
 
         elif control_action == ControlAction.HOLD:
-            self._pattern = self.pattern_map.hold
+            self._pattern = self.pattern_hold
             return
 
         elif control_action in (
@@ -104,7 +98,7 @@ class ControlButton(Button):
             ControlAction.SNAP_7_8,
         ):
             if self._active == True:
-                self._secondary = 1 - self._secondary
+                self._secondary = not self._secondary
             self._active = True
 
             if control_action == ControlAction.SNAP_1_2:
