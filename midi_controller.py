@@ -108,14 +108,12 @@ class MidiController:
                 ControlAction.SNAP_5_6,
                 ControlAction.SNAP_7_8,
             ):
-                self.np.set_pattern(pattern=ctrl.pattern(), id=ctrl.id)
                 self.snap = ctrl.snap_value()
                 self.msg_queue.append(self._snap_msg())
 
                 for c_other in self.control_buttons:
                     if c_other.id != idx:
                         c_other.set_passive()
-                        self.np.set_pattern(pattern=c_other.pattern(), id=c_other.id)
 
             elif action == ControlAction.PRESET_UP:
                 self._preset_update(1)
@@ -129,6 +127,11 @@ class MidiController:
 
             if action != ControlAction.NONE:
                 self._refresh_display()
+
+        for idx, ctrl in enumerate(self.control_buttons):
+            pattern = ctrl.consume_pattern()
+            if pattern is not None:
+                self.np.set_pattern(pattern=pattern, id=idx)
 
         self.np.poll()
 

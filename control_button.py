@@ -58,20 +58,30 @@ class ControlButton(Button):
         self._pattern = Off()
         self._snap_value = 0
 
+    def _update_pattern(self):
+        if self.led_mode == LEDMode.SNAP:
+            # Primary
+            if self._secondary == 0:
+                if self._active == True:
+                    self._pattern = self.pattern_map.active_primary
+                else:
+                    self._pattern = self.pattern_map.passive_primary
+            # Secondary
+            else:
+                if self._active == True:
+                    self._pattern = self.pattern_map.active_secondary
+                else:
+                    self._pattern = self.pattern_map.passive_secondary
+
     def set_passive(self):
         self._active = False
+        self._update_pattern()
 
-        if self.led_mode == LEDMode.SNAP:
-            if self._secondary == 0:
-                self._pattern = self.pattern_map.passive_primary
-            else:
-                self._pattern = self.pattern_map.passive_secondary
-
-    def pattern(self) -> Pattern:
-        if self.led_mode == LEDMode.NONE:
-            return Off()
-        else:
-            return self._pattern
+    def consume_pattern(self) -> Pattern | None:
+        """Returns a new pattern if availble, otherwise returns None"""
+        pattern = self._pattern
+        self._pattern = None
+        return pattern
 
     def snap_value(self) -> int:
         return self._snap_value
@@ -99,12 +109,6 @@ class ControlButton(Button):
             if control_action == ControlAction.SNAP_7_8:
                 self._snap_value = 7 + self._secondary
 
-            if self.led_mode == LEDMode.SNAP:
-                if self._secondary == 0:
-                    self._pattern = self.pattern_map.active_primary
-                else:
-                    self._pattern = self.pattern_map.active_secondary
-
     def update(self) -> ControlAction:
         event = self.consume()
         action = ControlAction.NONE
@@ -117,5 +121,6 @@ class ControlButton(Button):
             action = self.action_long
 
         self.exec_action(action)
+        self._update_pattern()
 
         return action
