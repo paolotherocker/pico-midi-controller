@@ -37,15 +37,17 @@ class ControlButton(Button):
         self,
         id: int,
         pin: int,
-        action_short: ControlAction,
-        action_long: ControlAction,
-        led_mode: LEDMode,
+        action_pressed: ControlAction = ControlAction.NONE,
+        action_short: ControlAction = ControlAction.NONE,
+        action_long: ControlAction = ControlAction.NONE,
+        led_mode: LEDMode = LEDMode.NONE,
         debounce_ms: int = 10,
         long_press_ms: int = 600,
         pattern_map: PatternMap = PatternMap(),
     ):
         super().__init__(pin, debounce_ms=debounce_ms, long_press_ms=long_press_ms)
         self.id = id
+        self.action_pressed = action_pressed
         self.action_short = action_short
         self.action_long = action_long
         self.led_mode = led_mode
@@ -107,7 +109,9 @@ class ControlButton(Button):
         event = self.consume()
         action = ControlAction.NONE
 
-        if event == ButtonEvent.SHORT_PRESS:
+        if event == ButtonEvent.PRESSED:
+            action = self.action_pressed
+        elif event == ButtonEvent.SHORT_PRESS:
             action = self.action_short
         elif event == ButtonEvent.LONG_PRESS:
             action = self.action_long

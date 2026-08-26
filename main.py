@@ -36,10 +36,30 @@ MIDI_MAP = MidiMap(
 )
 
 CONTROLS_MAP = [
-    [ControlAction.SNAP_1_2, ControlAction.NONE, LEDMode.SNAP],
-    [ControlAction.SNAP_3_4, ControlAction.PRESET_DOWN, LEDMode.SNAP],
-    [ControlAction.SNAP_5_6, ControlAction.PRESET_UP, LEDMode.SNAP],
-    [ControlAction.SNAP_7_8, ControlAction.NONE, LEDMode.SNAP],
+    [
+        ControlAction.NONE,
+        ControlAction.SNAP_1_2,
+        ControlAction.NONE,
+        LEDMode.SNAP,
+    ],
+    [
+        ControlAction.NONE,
+        ControlAction.SNAP_3_4,
+        ControlAction.PRESET_DOWN,
+        LEDMode.SNAP,
+    ],
+    [
+        ControlAction.NONE,
+        ControlAction.SNAP_5_6,
+        ControlAction.PRESET_UP,
+        LEDMode.SNAP,
+    ],
+    [
+        ControlAction.NONE,
+        ControlAction.SNAP_7_8,
+        ControlAction.NONE,
+        LEDMode.SNAP,
+    ],
 ]
 
 
@@ -56,13 +76,13 @@ for i in range(4):
         ControlButton(
             id=i,
             pin=P_CONTROLS[i],
-            action_short=CONTROLS_MAP[i][0],
-            action_long=CONTROLS_MAP[i][1],
-            led_mode=CONTROLS_MAP[i][2],
+            action_pressed=CONTROLS_MAP[i][0],
+            action_short=CONTROLS_MAP[i][1],
+            action_long=CONTROLS_MAP[i][2],
+            led_mode=CONTROLS_MAP[i][3],
             pattern_map=SNAP_PATTERN_MAP,
         )
     )
-
 
 encoder = Rotary(dt_pin=P_ROTARY_DT, clk_pin=P_ROTARY_CLK)
 tm = TM1637(clk=Pin(P_DISP_CLK), dio=Pin(P_DISP_DIO))
