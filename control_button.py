@@ -22,16 +22,16 @@ class PatternMap:
 
     def __init__(
         self,
-        active_primary: Pattern = Off(),
-        active_secondary: Pattern = Off(),
-        passive_primary: Pattern = Off(),
-        passive_secondary: Pattern = Off(),
+        snap_active_0: Pattern = Off(),
+        snap_active_1: Pattern = Off(),
+        snap_passive_0: Pattern = Off(),
+        snap_passive_1: Pattern = Off(),
         hold: Pattern = Off(),
     ):
-        self.active_primary = active_primary
-        self.active_secondary = active_secondary
-        self.passive_primary = passive_primary
-        self.passive_secondary = passive_secondary
+        self.snap_active_0 = snap_active_0
+        self.snap_active_1 = snap_active_1
+        self.snap_passive_0 = snap_passive_0
+        self.snap_passive_1 = snap_passive_1
         self.hold = hold
 
 
@@ -66,15 +66,15 @@ class ControlButton(Button):
             # Primary
             if self._secondary == 0:
                 if self._active == True:
-                    self._pattern = self.pattern_map.active_primary
+                    self._pattern = self.pattern_map.snap_active_0
                 else:
-                    self._pattern = self.pattern_map.passive_primary
+                    self._pattern = self.pattern_map.snap_passive_0
             # Secondary
             else:
                 if self._active == True:
-                    self._pattern = self.pattern_map.active_secondary
+                    self._pattern = self.pattern_map.snap_active_1
                 else:
-                    self._pattern = self.pattern_map.passive_secondary
+                    self._pattern = self.pattern_map.snap_passive_1
 
     def set_passive(self):
         self._active = False
