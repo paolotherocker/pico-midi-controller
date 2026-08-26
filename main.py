@@ -35,40 +35,44 @@ MIDI_MAP = MidiMap(
     channel=0, snap_cc=24, preset_cc=20, preset_up_val=1, preset_down_val=2
 )
 
-CONTROLS_MAP = [
-    [
-        ControlAction.HOLD,
-        ControlAction.SNAP_1_2,
-        ControlAction.NONE,
-        LEDMode.SNAP,
-    ],
-    [
-        ControlAction.HOLD,
-        ControlAction.SNAP_3_4,
-        ControlAction.PRESET_DOWN,
-        LEDMode.SNAP,
-    ],
-    [
-        ControlAction.HOLD,
-        ControlAction.SNAP_5_6,
-        ControlAction.PRESET_UP,
-        LEDMode.SNAP,
-    ],
-    [
-        ControlAction.HOLD,
-        ControlAction.SNAP_7_8,
-        ControlAction.NONE,
-        LEDMode.SNAP,
-    ],
-]
-
-
 SNAP_PATTERN_MAP = PatternMap(
     Pulse(color1=(0, 200, 0), color2=(0, 180, 20), period_ms=5000),
     Pulse(color1=(0, 0, 200), color2=(0, 20, 180), period_ms=5000),
     Solid(color=(0, 80, 0)),
     Solid(color=(0, 0, 80)),
 )
+
+CONTROLS_MAP = [
+    [
+        ControlAction.HOLD,
+        ControlAction.SNAP_1_2,
+        ControlAction.NONE,
+        LEDMode.SNAP,
+        SNAP_PATTERN_MAP,
+    ],
+    [
+        ControlAction.HOLD,
+        ControlAction.SNAP_3_4,
+        ControlAction.PRESET_DOWN,
+        LEDMode.SNAP,
+        SNAP_PATTERN_MAP,
+    ],
+    [
+        ControlAction.HOLD,
+        ControlAction.SNAP_5_6,
+        ControlAction.PRESET_UP,
+        LEDMode.SNAP,
+        SNAP_PATTERN_MAP,
+    ],
+    [
+        ControlAction.HOLD,
+        ControlAction.SNAP_7_8,
+        ControlAction.NONE,
+        LEDMode.SNAP,
+        SNAP_PATTERN_MAP,
+    ],
+]
+
 
 controls = []
 for i in range(4):
@@ -80,7 +84,7 @@ for i in range(4):
             action_short=CONTROLS_MAP[i][1],
             action_long=CONTROLS_MAP[i][2],
             led_mode=CONTROLS_MAP[i][3],
-            pattern_map=SNAP_PATTERN_MAP,
+            pattern_map=CONTROLS_MAP[i][4],
         )
     )
 
