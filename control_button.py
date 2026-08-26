@@ -4,12 +4,13 @@ from utils.neopixelmanager import Pattern, Off
 
 class ControlAction:
     NONE = 0
-    SNAP_1_2 = 1
-    SNAP_3_4 = 2
-    SNAP_5_6 = 3
-    SNAP_7_8 = 4
-    PRESET_UP = 5
-    PRESET_DOWN = 6
+    HOLD = 1
+    SNAP_1_2 = 2
+    SNAP_3_4 = 3
+    SNAP_5_6 = 4
+    SNAP_7_8 = 5
+    PRESET_UP = 6
+    PRESET_DOWN = 7
 
 
 class LEDMode:
@@ -25,11 +26,13 @@ class PatternMap:
         active_secondary: Pattern = Off(),
         passive_primary: Pattern = Off(),
         passive_secondary: Pattern = Off(),
+        hold: Pattern = Off(),
     ):
         self.active_primary = active_primary
         self.active_secondary = active_secondary
         self.passive_primary = passive_primary
         self.passive_secondary = passive_secondary
+        self.hold = hold
 
 
 class ControlButton(Button):
@@ -90,7 +93,11 @@ class ControlButton(Button):
         if control_action == ControlAction.NONE:
             return
 
-        if control_action in (
+        elif control_action == ControlAction.HOLD:
+            self._pattern = self.pattern_map.hold
+            return
+
+        elif control_action in (
             ControlAction.SNAP_1_2,
             ControlAction.SNAP_3_4,
             ControlAction.SNAP_5_6,

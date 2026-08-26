@@ -37,25 +37,25 @@ MIDI_MAP = MidiMap(
 
 CONTROLS_MAP = [
     [
-        ControlAction.NONE,
+        ControlAction.HOLD,
         ControlAction.SNAP_1_2,
         ControlAction.NONE,
         LEDMode.SNAP,
     ],
     [
-        ControlAction.NONE,
+        ControlAction.HOLD,
         ControlAction.SNAP_3_4,
         ControlAction.PRESET_DOWN,
         LEDMode.SNAP,
     ],
     [
-        ControlAction.NONE,
+        ControlAction.HOLD,
         ControlAction.SNAP_5_6,
         ControlAction.PRESET_UP,
         LEDMode.SNAP,
     ],
     [
-        ControlAction.NONE,
+        ControlAction.HOLD,
         ControlAction.SNAP_7_8,
         ControlAction.NONE,
         LEDMode.SNAP,
@@ -64,10 +64,10 @@ CONTROLS_MAP = [
 
 
 SNAP_PATTERN_MAP = PatternMap(
-    Pulse(color1=(0, 80, 0), color2=(0, 60, 20), period_ms=5000),
-    Pulse(color1=(0, 0, 80), color2=(0, 20, 60), period_ms=5000),
-    Solid(color=(0, 10, 0)),
-    Solid(color=(0, 0, 10)),
+    Pulse(color1=(0, 200, 0), color2=(0, 180, 20), period_ms=5000),
+    Pulse(color1=(0, 0, 200), color2=(0, 20, 180), period_ms=5000),
+    Solid(color=(0, 80, 0)),
+    Solid(color=(0, 0, 80)),
 )
 
 controls = []
