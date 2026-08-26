@@ -1,6 +1,6 @@
 from utils.neopixelmanager import NeoPixelManager
 from utils.rotary import Rotary
-from utils.midimessages import Message, ControlChange
+from utils.midi import Message, ControlChange
 from control_button import ControlButton, ControlAction
 from tm1637 import TM1637
 from collections import deque
