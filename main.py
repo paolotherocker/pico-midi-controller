@@ -43,34 +43,17 @@ SNAP_PATTERN_MAP = PatternMap(
 )
 
 CONTROLS_MAP = [
-    [
-        ControlAction.HOLD,
-        ControlAction.SNAP_1_2,
-        ControlAction.NONE,
-        LEDMode.SNAP,
-        SNAP_PATTERN_MAP,
-    ],
-    [
-        ControlAction.HOLD,
-        ControlAction.SNAP_3_4,
-        ControlAction.PRESET_DOWN,
-        LEDMode.SNAP,
-        SNAP_PATTERN_MAP,
-    ],
-    [
-        ControlAction.HOLD,
-        ControlAction.SNAP_5_6,
-        ControlAction.PRESET_UP,
-        LEDMode.SNAP,
-        SNAP_PATTERN_MAP,
-    ],
-    [
-        ControlAction.HOLD,
-        ControlAction.SNAP_7_8,
-        ControlAction.NONE,
-        LEDMode.SNAP,
-        SNAP_PATTERN_MAP,
-    ],
+    [ControlAction.HOLD, ControlAction.SNAP_1_2, ControlAction.NONE],
+    [ControlAction.HOLD, ControlAction.SNAP_3_4, ControlAction.PRESET_DOWN],
+    [ControlAction.HOLD, ControlAction.SNAP_5_6, ControlAction.PRESET_UP],
+    [ControlAction.HOLD, ControlAction.SNAP_7_8, ControlAction.NONE],
+]
+
+LED_MAP = [
+    [LEDMode.SNAP, SNAP_PATTERN_MAP],
+    [LEDMode.SNAP, SNAP_PATTERN_MAP],
+    [LEDMode.SNAP, SNAP_PATTERN_MAP],
+    [LEDMode.SNAP, SNAP_PATTERN_MAP],
 ]
 
 
@@ -83,8 +66,8 @@ for i in range(4):
             action_pressed=CONTROLS_MAP[i][0],
             action_short=CONTROLS_MAP[i][1],
             action_long=CONTROLS_MAP[i][2],
-            led_mode=CONTROLS_MAP[i][3],
-            pattern_map=CONTROLS_MAP[i][4],
+            led_mode=LED_MAP[i][0],
+            pattern_map=LED_MAP[i][1],
         )
     )
 

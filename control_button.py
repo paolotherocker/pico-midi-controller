@@ -22,16 +22,16 @@ class PatternMap:
 
     def __init__(
         self,
-        snap_active_0: Pattern = Off(),
-        snap_active_1: Pattern = Off(),
-        snap_passive_0: Pattern = Off(),
-        snap_passive_1: Pattern = Off(),
+        active_0: Pattern = Off(),
+        active_1: Pattern = Off(),
+        passive_0: Pattern = Off(),
+        passive_1: Pattern = Off(),
         hold: Pattern = Off(),
     ):
-        self.snap_active_0 = snap_active_0
-        self.snap_active_1 = snap_active_1
-        self.snap_passive_0 = snap_passive_0
-        self.snap_passive_1 = snap_passive_1
+        self.active_0 = active_0
+        self.active_1 = active_1
+        self.passive_0 = passive_0
+        self.passive_1 = passive_1
         self.hold = hold
 
 
@@ -56,8 +56,8 @@ class ControlButton(Button):
         self.led_mode = led_mode
 
         self.pattern_snap = (
-            (pattern_map.snap_passive_0, pattern_map.snap_passive_1),
-            (pattern_map.snap_active_0, pattern_map.snap_active_1),
+            (pattern_map.passive_0, pattern_map.passive_1),
+            (pattern_map.active_0, pattern_map.active_1),
         )
         self.pattern_hold = pattern_map.hold
 
