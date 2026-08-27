@@ -12,10 +12,10 @@ class ControlAction:
     PRESET_DOWN = 7
     # Looper transport actions. All map onto the same MIDI CC
     # (looper_cc), distinguished only by CC value.
-    REC_OD = 8
-    STOP_PLAY = 9
-    UNDO = 10
-    CLEAR = 11
+    LOOPER_REC_OD = 8
+    LOOPER_STOP_PLAY = 9
+    LOOPER_UNDO = 10
+    LOOPER_CLEAR = 11
 
 
 class LEDMode:

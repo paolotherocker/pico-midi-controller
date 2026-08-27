@@ -49,6 +49,11 @@ PATTERN_MAP = PatternMap(
     snap_active_sec=Pulse((0, 0, 200), (0, 20, 180), period_ms=5000),
     snap_passive=Solid((0, 80, 0)),
     snap_passive_sec=Solid((0, 0, 80)),
+    looper_empty=Solid((0, 100, 0)),  # Green
+    looper_stopped=Solid((100, 100, 0)),  # Yellow
+    looper_playing=Solid((200, 200, 0)),  # Yellow
+    looper_recording=Solid((200, 0, 0)),  # Red
+    looper_overdubbing=Solid((200, 0, 0)),  # Red
 )
 
 CONTROLS_MAP = [

@@ -39,8 +39,6 @@ class MidiMap:
         self.PRESET_CC = preset_cc
         self.PRESET_UP_VAL = preset_up_val
         self.PRESET_DOWN_VAL = preset_down_val
-        # Looper transport: all four actions share one CC number and are
-        # distinguished purely by the CC value sent.
         self.LOOPER_CC = looper_cc
         self.LOOPER_RO_VAL = looper_ro_val
         self.LOOPER_SP_VAL = looper_sp_val
@@ -185,10 +183,6 @@ class PresetManager:
 
 
 class LooperState:
-    """Loop-station transport states, mirroring commercial loopers
-    (TC Ditto, Boss RC series): empty, recording, playing, overdubbing,
-    stopped."""
-
     EMPTY = 0
     RECORDING = 1
     PLAYING = 2
@@ -199,7 +193,7 @@ class LooperState:
 class LooperManager:
     """Shared loop-transport state machine.
 
-    REC_OD, STOP_PLAY, UNDO and CLEAR are typically wired to separate
+    LOOPER_REC_OD, LOOPER_STOP_PLAY, LOOPER_UNDO and LOOPER_CLEAR are typically wired to separate
     physical footswitches, but they all act on the same loop, so every
     button tagged LEDMode.LOOPER is driven from this one shared state
     rather than each switch tracking its own local flag.
@@ -214,7 +208,7 @@ class LooperManager:
     def exec_action(self, control_action: ControlAction):
         """Advance the state machine. Retrieve the resulting MIDI message
         via msg()."""
-        if control_action == ControlAction.REC_OD:
+        if control_action == ControlAction.LOOPER_REC_OD:
             if self.state in (LooperState.EMPTY, LooperState.STOPPED):
                 self.state = LooperState.RECORDING
             elif self.state == LooperState.RECORDING:
@@ -225,7 +219,7 @@ class LooperManager:
                 self.state = LooperState.PLAYING
             self._msg_value = self.midi_map.LOOPER_RO_VAL
 
-        elif control_action == ControlAction.STOP_PLAY:
+        elif control_action == ControlAction.LOOPER_STOP_PLAY:
             if self.state in (
                 LooperState.RECORDING,
                 LooperState.PLAYING,
@@ -236,11 +230,11 @@ class LooperManager:
                 self.state = LooperState.PLAYING
             self._msg_value = self.midi_map.LOOPER_SP_VAL
 
-        elif control_action == ControlAction.CLEAR:
+        elif control_action == ControlAction.LOOPER_CLEAR:
             self.state = LooperState.EMPTY
             self._msg_value = self.midi_map.LOOPER_CLEAR_VAL
 
-        else:  # ControlAction.UNDO -- does not change the transport state.
+        else:  # ControlAction.LOOPER_UNDO -- does not change the transport state.
             self._msg_value = self.midi_map.LOOPER_UNDO_VAL
 
     def msg(self) -> ControlChange:
@@ -352,10 +346,10 @@ class MidiController:
                 self.np.set_pattern(pattern=self.pattern_map.HOLD, id=idx)
 
             elif action in (
-                ControlAction.REC_OD,
-                ControlAction.STOP_PLAY,
-                ControlAction.UNDO,
-                ControlAction.CLEAR,
+                ControlAction.LOOPER_REC_OD,
+                ControlAction.LOOPER_STOP_PLAY,
+                ControlAction.LOOPER_UNDO,
+                ControlAction.LOOPER_CLEAR,
             ):
                 self.looper.exec_action(action)
                 self.msg_queue.append(self.looper.msg())
