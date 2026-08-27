@@ -6,7 +6,7 @@ from tm1637 import TM1637
 from collections import deque
 import time
 
-MIDI_INTERVAL_MS = 200
+MIDI_INTERVAL_MS = 50
 
 
 class MidiMap:
@@ -182,14 +182,6 @@ class PresetManager:
         return self._value
 
 
-class LooperState:
-    EMPTY = 0
-    RECORDING = 1
-    PLAYING = 2
-    OVERDUBBING = 3
-    STOPPED = 4
-
-
 class LooperManager:
     """Shared loop-transport state machine.
 
@@ -199,39 +191,45 @@ class LooperManager:
     rather than each switch tracking its own local flag.
     """
 
+    _EMPTY = 0
+    _RECORDING = 1
+    _PLAYING = 2
+    _OVERDUBBING = 3
+    _STOPPED = 4
+
     def __init__(self, midi_map: MidiMap, pattern_map: PatternMap):
         self.midi_map = midi_map
         self.pattern_map = pattern_map
-        self.state = LooperState.EMPTY
+        self.state = self._EMPTY
         self._msg_value = midi_map.LOOPER_UNDO_VAL
 
     def exec_action(self, control_action: ControlAction):
         """Advance the state machine. Retrieve the resulting MIDI message
         via msg()."""
         if control_action == ControlAction.LOOPER_REC_OD:
-            if self.state in (LooperState.EMPTY, LooperState.STOPPED):
-                self.state = LooperState.RECORDING
-            elif self.state == LooperState.RECORDING:
-                self.state = LooperState.PLAYING
-            elif self.state == LooperState.PLAYING:
-                self.state = LooperState.OVERDUBBING
-            elif self.state == LooperState.OVERDUBBING:
-                self.state = LooperState.PLAYING
+            if self.state in (self._EMPTY, self._STOPPED):
+                self.state = self._RECORDING
+            elif self.state == self._RECORDING:
+                self.state = self._PLAYING
+            elif self.state == self._PLAYING:
+                self.state = self._OVERDUBBING
+            elif self.state == self._OVERDUBBING:
+                self.state = self._PLAYING
             self._msg_value = self.midi_map.LOOPER_RO_VAL
 
         elif control_action == ControlAction.LOOPER_STOP_PLAY:
             if self.state in (
-                LooperState.RECORDING,
-                LooperState.PLAYING,
-                LooperState.OVERDUBBING,
+                self._RECORDING,
+                self._PLAYING,
+                self._OVERDUBBING,
             ):
-                self.state = LooperState.STOPPED
-            elif self.state == LooperState.STOPPED:
-                self.state = LooperState.PLAYING
+                self.state = self._STOPPED
+            elif self.state == self._STOPPED:
+                self.state = self._PLAYING
             self._msg_value = self.midi_map.LOOPER_SP_VAL
 
         elif control_action == ControlAction.LOOPER_CLEAR:
-            self.state = LooperState.EMPTY
+            self.state = self._EMPTY
             self._msg_value = self.midi_map.LOOPER_CLEAR_VAL
 
         else:  # ControlAction.LOOPER_UNDO -- does not change the transport state.
@@ -245,13 +243,13 @@ class LooperManager:
         )
 
     def pattern(self) -> Pattern:
-        if self.state == LooperState.RECORDING:
+        if self.state == self._RECORDING:
             return self.pattern_map.LOOPER_RECORDING
-        if self.state == LooperState.PLAYING:
+        if self.state == self._PLAYING:
             return self.pattern_map.LOOPER_PLAYING
-        if self.state == LooperState.OVERDUBBING:
+        if self.state == self._OVERDUBBING:
             return self.pattern_map.LOOPER_OVERDUBBING
-        if self.state == LooperState.STOPPED:
+        if self.state == self._STOPPED:
             return self.pattern_map.LOOPER_STOPPED
         return self.pattern_map.LOOPER_EMPTY
 

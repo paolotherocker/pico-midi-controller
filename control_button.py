@@ -2,6 +2,8 @@ from utils.button import Button, ButtonEvent
 
 
 class ControlAction:
+    """Action that can be executed by a Button Event"""
+
     NONE = 0
     HOLD = 1
     SNAP_1_2 = 2
@@ -10,8 +12,6 @@ class ControlAction:
     SNAP_7_8 = 5
     PRESET_UP = 6
     PRESET_DOWN = 7
-    # Looper transport actions. All map onto the same MIDI CC
-    # (looper_cc), distinguished only by CC value.
     LOOPER_REC_OD = 8
     LOOPER_STOP_PLAY = 9
     LOOPER_UNDO = 10
@@ -19,11 +19,7 @@ class ControlAction:
 
 
 class LEDMode:
-    """Tag telling MidiController how to compute a button's NeoPixel
-    pattern. ControlButton itself holds no LED or application state --
-    all of that lives in MidiController's Snap and Looper state machines,
-    which is what actually drives the pixels for every button sharing a
-    given mode."""
+    """Behaviour descriptor of the LED string associated with a Control Button"""
 
     NONE = 0
     SNAP = 1
@@ -35,8 +31,6 @@ class ControlButton(Button):
 
     Just a debounced button that knows which ControlAction to report for
     a press/short-press/long-press, and which LEDMode group it belongs to.
-    It does not track snap/looper/active/secondary state itself -- see
-    MidiController for that.
     """
 
     def __init__(
