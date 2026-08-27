@@ -10,8 +10,8 @@ from utils.rotary import Rotary
 from utils.neopixelmanager import NeoPixelManager, Pulse, Solid, Off
 import time
 from tm1637 import TM1637
-from midi_controller import MidiController, MidiMap
-from control_button import ControlButton, ControlAction, LEDMode, PatternMap
+from midi_controller import MidiController, MidiMap, PatternMap
+from control_button import ControlButton, ControlAction, LEDMode
 
 UPDATE_INTERVAL = 5
 
@@ -32,14 +32,23 @@ P_ROTARY_SW = 13
 P_MENU_BUTTONS = [10, 11]
 
 MIDI_MAP = MidiMap(
-    channel=0, snap_cc=24, preset_cc=20, preset_up_val=1, preset_down_val=2
+    channel=0,
+    snap_cc=24,
+    preset_cc=20,
+    preset_up_val=1,
+    preset_down_val=2,
+    looper_cc=25,
+    looper_ro_val=1,
+    looper_sp_val=2,
+    looper_clear_val=3,
+    looper_undo_val=4,
 )
 
-SNAP_PATTERN_MAP = PatternMap(
-    Pulse(color1=(0, 200, 0), color2=(0, 180, 20), period_ms=5000),
-    Pulse(color1=(0, 0, 200), color2=(0, 20, 180), period_ms=5000),
-    Solid(color=(0, 80, 0)),
-    Solid(color=(0, 0, 80)),
+PATTERN_MAP = PatternMap(
+    snap_active=Pulse((0, 200, 0), (0, 180, 20), period_ms=5000),
+    snap_active_sec=Pulse((0, 0, 200), (0, 20, 180), period_ms=5000),
+    snap_passive=Solid((0, 80, 0)),
+    snap_passive_sec=Solid((0, 0, 80)),
 )
 
 CONTROLS_MAP = [
@@ -49,12 +58,7 @@ CONTROLS_MAP = [
     [ControlAction.HOLD, ControlAction.SNAP_7_8, ControlAction.NONE],
 ]
 
-LED_MAP = [
-    [LEDMode.SNAP, SNAP_PATTERN_MAP],
-    [LEDMode.SNAP, SNAP_PATTERN_MAP],
-    [LEDMode.SNAP, SNAP_PATTERN_MAP],
-    [LEDMode.SNAP, SNAP_PATTERN_MAP],
-]
+LED_MAP = [LEDMode.SNAP, LEDMode.SNAP, LEDMode.SNAP, LEDMode.SNAP]
 
 
 controls = []
@@ -66,8 +70,7 @@ for i in range(4):
             action_pressed=CONTROLS_MAP[i][0],
             action_short=CONTROLS_MAP[i][1],
             action_long=CONTROLS_MAP[i][2],
-            led_mode=LED_MAP[i][0],
-            pattern_map=LED_MAP[i][1],
+            led_mode=LED_MAP[i],
         )
     )
 
@@ -84,6 +87,7 @@ midi_controller = MidiController(
     encoder=encoder,
     display=tm,
     midi_map=MIDI_MAP,
+    pattern_map=PATTERN_MAP,
 )
 
 while True:
