@@ -288,35 +288,17 @@ class MidiController:
         self.midi_map = midi_map
         self.pattern_map = pattern_map
 
-        # Manager instances are always created here, regardless of whether
-        # the wiring/config actually uses them. Each one also builds its
-        # own MIDI messages via msg(), so MidiController never touches raw
-        # CC numbers.
+        # Manager instances
         self.snap = SnapManager(midi_map=midi_map, pattern_map=pattern_map)
         self.preset = PresetManager(midi_map=midi_map, preset_num=preset_num)
         self.looper = LooperManager(midi_map=midi_map, pattern_map=pattern_map)
 
+        # MIDI message queue
         self.msg_queue = deque((), 25)
         self.msg_time: int = 0
 
         self.display.brightness(3)
         self.display.show("")
-
-    def _refresh_display(self):
-        self.display.show(
-            f" {self._PATCH_MAP[self.preset.value()]} {self.snap.value()}"
-        )
-
-    def _refresh_snap_leds(self):
-        for idx, ctrl in enumerate(self.control_buttons):
-            if ctrl.led_mode == LEDMode.SNAP:
-                self.np.set_pattern(pattern=self.snap.pattern(idx), id=idx)
-
-    def _refresh_looper_leds(self):
-        pattern = self.looper.pattern()
-        for idx, ctrl in enumerate(self.control_buttons):
-            if ctrl.led_mode == LEDMode.LOOPER:
-                self.np.set_pattern(pattern=pattern, id=idx)
 
     def update(self):
         for idx, ctrl in enumerate(self.control_buttons):
@@ -333,7 +315,6 @@ class MidiController:
             ):
                 self.snap.exec_action(idx, action)
                 self.msg_queue.append(self.snap.msg())
-                self._refresh_snap_leds()
 
             elif action in (ControlAction.PRESET_UP, ControlAction.PRESET_DOWN):
                 self.preset.exec_action(action)
@@ -351,9 +332,18 @@ class MidiController:
             ):
                 self.looper.exec_action(action)
                 self.msg_queue.append(self.looper.msg())
-                self._refresh_looper_leds()
 
-            self._refresh_display()
+        # Refresh NP
+        for idx, ctrl in enumerate(self.control_buttons):
+            if ctrl.led_mode == LEDMode.SNAP:
+                self.np.set_pattern(pattern=self.snap.pattern(idx), id=idx)
+            if ctrl.led_mode == LEDMode.LOOPER:
+                self.np.set_pattern(pattern=self.looper.pattern(), id=idx)
+
+        # Refresh Display
+        self.display.show(
+            f" {self._PATCH_MAP[self.preset.value()]} {self.snap.value()}"
+        )
 
         self.np.poll()
 

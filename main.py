@@ -57,10 +57,10 @@ PATTERN_MAP = PatternMap(
 )
 
 CONTROLS_MAP = [
-    [ControlAction.HOLD, ControlAction.SNAP_1_2, ControlAction.NONE],
-    [ControlAction.HOLD, ControlAction.SNAP_3_4, ControlAction.PRESET_DOWN],
-    [ControlAction.HOLD, ControlAction.SNAP_5_6, ControlAction.PRESET_UP],
-    [ControlAction.HOLD, ControlAction.SNAP_7_8, ControlAction.NONE],
+    [ControlAction.NONE, ControlAction.SNAP_1_2, ControlAction.NONE],
+    [ControlAction.NONE, ControlAction.SNAP_3_4, ControlAction.PRESET_DOWN],
+    [ControlAction.NONE, ControlAction.SNAP_5_6, ControlAction.PRESET_UP],
+    [ControlAction.NONE, ControlAction.SNAP_7_8, ControlAction.NONE],
 ]
 
 LED_MAP = [LEDMode.SNAP, LEDMode.SNAP, LEDMode.SNAP, LEDMode.SNAP]
