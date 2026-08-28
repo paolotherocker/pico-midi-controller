@@ -1,5 +1,5 @@
 from utils.neopixelmanager import NeoPixelManager, Pattern, Off
-from utils.rotary import Rotary
+from utils.ky040 import KY040
 from utils.midi import Message, ControlChange
 from control_button import ControlButton, ControlAction, LEDMode
 from tm1637 import TM1637
@@ -275,7 +275,7 @@ class MidiController:
         self,
         control_buttons: list[ControlButton],
         np: NeoPixelManager,
-        encoder: Rotary,
+        encoder: KY040,
         display: TM1637,
         midi_map: MidiMap,
         preset_num: int = 8,

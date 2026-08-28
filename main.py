@@ -6,7 +6,7 @@ mpremote fs cp -r lib_common :/lib
 """
 
 from machine import Pin
-from utils.rotary import Rotary
+from utils.ky040 import KY040
 from utils.neopixelmanager import NeoPixelManager, Pulse, Solid, Off
 import time
 from tm1637 import TM1637
@@ -85,8 +85,8 @@ for i in range(4):
         )
     )
 
-encoder = Rotary(dt_pin=P_ROTARY_DT, clk_pin=P_ROTARY_CLK)
-tm = TM1637(clk=Pin(P_DISP_CLK), dio=Pin(P_DISP_DIO))
+encoder = KY040(dt_pin=P_ROTARY_DT, clk_pin=P_ROTARY_CLK)
+display = TM1637(clk=Pin(P_DISP_CLK), dio=Pin(P_DISP_DIO))
 
 np_array = NeoPixelManager(pin_id=P_NP, n=NP_STRIP_LEN * NP_STRIP_NUM)
 for i in range(NP_STRIP_NUM):
@@ -96,7 +96,7 @@ midi_controller = MidiController(
     control_buttons=controls,
     np=np_array,
     encoder=encoder,
-    display=tm,
+    display=display,
     midi_map=MIDI_MAP,
     pattern_map=PATTERN_MAP,
     send_mode_msg=SEND_MODE_MSG,
