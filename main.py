@@ -13,6 +13,7 @@ from tm1637 import TM1637
 from midi_controller import MidiController, MidiMap, PatternMap
 from control_button import ControlButton, ControlAction, LEDMode
 
+# Main refresh interval
 UPDATE_INTERVAL = 5
 
 # Display
@@ -34,6 +35,7 @@ P_MENU_BUTTONS = [10, 11]
 MIDI_MAP = MidiMap(
     channel=0,
     snap_cc=24,
+    snap_mode_val=0,
     preset_cc=20,
     preset_up_val=1,
     preset_down_val=2,
@@ -65,6 +67,10 @@ CONTROLS_MAP = [
 
 LED_MAP = [LEDMode.SNAP, LEDMode.SNAP, LEDMode.SNAP, LEDMode.SNAP]
 
+# Send a mode message every time a snap message is sent
+SEND_MODE_MSG = True
+# Send a snap message every time a preset message is sent
+REMEMBER_SNAP = True
 
 controls = []
 for i in range(4):
@@ -93,6 +99,8 @@ midi_controller = MidiController(
     display=tm,
     midi_map=MIDI_MAP,
     pattern_map=PATTERN_MAP,
+    send_mode_msg=SEND_MODE_MSG,
+    remember_snap=REMEMBER_SNAP,
 )
 
 while True:

@@ -6,12 +6,13 @@ from tm1637 import TM1637
 from collections import deque
 import time
 
-MIDI_INTERVAL_MS = 50
+MIDI_INTERVAL_MS = 8
 
 
 class MidiMap:
     CHANNEL: int
     SNAP_CC: int
+    SNAP_MODE_VAL: int
     PRESET_CC: int
     PRESET_UP_VAL: int
     PRESET_DOWN_VAL: int
@@ -25,6 +26,7 @@ class MidiMap:
         self,
         channel: int,
         snap_cc: int,
+        snap_mode_val: int,
         preset_cc: int,
         preset_up_val: int,
         preset_down_val: int,
@@ -36,6 +38,7 @@ class MidiMap:
     ):
         self.CHANNEL = channel
         self.SNAP_CC = snap_cc
+        self.SNAP_MODE_VAL = snap_mode_val
         self.PRESET_CC = preset_cc
         self.PRESET_UP_VAL = preset_up_val
         self.PRESET_DOWN_VAL = preset_down_val
@@ -110,6 +113,12 @@ class SnapManager:
         self._secondary = {}
         self._value = 0
 
+        self._snap_mode_msg = ControlChange(
+            channel=midi_map.CHANNEL,
+            controller=midi_map.SNAP_CC,
+            value=midi_map.SNAP_MODE_VAL,
+        )
+
     def exec_action(self, id: int, control_action: ControlAction):
         """Handle a SNAP_x_y press on button `id`. Retrieve the resulting
         MIDI message via msg()."""
@@ -120,6 +129,9 @@ class SnapManager:
         self._secondary[id] = secondary
 
         self._value = self._BASE_VALUE[control_action] + secondary
+
+    def snap_mode_msg(self) -> ControlChange:
+        return self._snap_mode_msg
 
     def msg(self) -> ControlChange:
         return ControlChange(
@@ -268,6 +280,8 @@ class MidiController:
         midi_map: MidiMap,
         preset_num: int = 8,
         pattern_map: PatternMap = PatternMap(),
+        send_mode_msg: bool = False,
+        remember_snap: bool = False,
     ):
         """Build Midi Controller object. Only pass pre-allocated and initialised objects
 
@@ -280,6 +294,10 @@ class MidiController:
             preset_num (int, optional): Maximum number of presets. Defaults to 8.
             pattern_map (PatternMap, optional): LED patterns for every mode
                 (SNAP, LOOPER, HOLD). Defaults to all off.
+            send_mode_msg (bool): Send a snap mode msg to switch to snap mode every
+                time a snap message is being sent
+            remember_snap (bool): Sends a snap message every time a preset msg is
+                sent, to make sure the device switches to the same snap number
         """
         self.control_buttons = control_buttons
         self.np = np
@@ -287,6 +305,8 @@ class MidiController:
         self.display = display
         self.midi_map = midi_map
         self.pattern_map = pattern_map
+        self.send_mode_msg = send_mode_msg
+        self.remember_snap = remember_snap
 
         # Manager instances
         self.snap = SnapManager(midi_map=midi_map, pattern_map=pattern_map)
@@ -314,12 +334,15 @@ class MidiController:
                 ControlAction.SNAP_7_8,
             ):
                 self.snap.exec_action(idx, action)
+                if self.send_mode_msg == True:
+                    self.msg_queue.append(self.snap.snap_mode_msg())
                 self.msg_queue.append(self.snap.msg())
 
             elif action in (ControlAction.PRESET_UP, ControlAction.PRESET_DOWN):
                 self.preset.exec_action(action)
                 self.msg_queue.append(self.preset.msg())
-                self.msg_queue.append(self.snap.msg())
+                if self.remember_snap == True:
+                    self.msg_queue.append(self.snap.msg())
 
             elif action == ControlAction.HOLD:
                 self.np.set_pattern(pattern=self.pattern_map.HOLD, id=idx)
