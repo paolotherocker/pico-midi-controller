@@ -6,12 +6,17 @@ mpremote fs cp -r lib_common :/lib
 """
 
 from machine import Pin
-from utils.ky040 import KY040
 from utils.neopixelmanager import NeoPixelManager, Pulse, Solid, Off
 import time
 from tm1637 import TM1637
-from midi_controller import MidiController, MidiMap, PatternMap
-from control_button import ControlButton, ControlAction, LEDMode
+from midi_controller import MidiController, MidiMap, PatternMap, ValueParam
+from control_hardware import (
+    ControlButton,
+    ControlEncoder,
+    MenuButton,
+    ControlAction,
+    LEDMode,
+)
 
 # Main refresh interval
 UPDATE_INTERVAL = 5
@@ -72,6 +77,16 @@ SEND_MODE_MSG = True
 # Send a snap message every time a preset message is sent
 REMEMBER_SNAP = True
 
+# Rotary encoder assignable targets, cycled by VALUE_TOGGLE (the encoder's
+# switch, below). Edit freely to change what the encoder controls.
+VALUE_PARAMS = [
+    ValueParam(label="V", cc=7, min_value=0, max_value=100, initial=64),  # Volume
+    ValueParam(label="A", cc=12, min_value=0, max_value=100, initial=0),  # Param A
+    ValueParam(label="B", cc=13, min_value=0, max_value=100, initial=0),  # Param B
+]
+# How long (ms) the value stays on screen after the last change
+VALUE_HANG_MS = 1000
+
 controls = []
 for i in range(4):
     controls.append(
@@ -85,7 +100,9 @@ for i in range(4):
         )
     )
 
-encoder = KY040(dt_pin=P_ROTARY_DT, clk_pin=P_ROTARY_CLK)
+control_encoder = ControlEncoder(id=0, dt_pin=P_ROTARY_DT, clk_pin=P_ROTARY_CLK)
+menu_button = MenuButton(id=0, pin=P_ROTARY_SW, action_long=ControlAction.VALUE_TOGGLE)
+
 display = TM1637(clk=Pin(P_DISP_CLK), dio=Pin(P_DISP_DIO))
 
 np_array = NeoPixelManager(pin_id=P_NP, n=NP_STRIP_LEN * NP_STRIP_NUM)
@@ -95,12 +112,15 @@ for i in range(NP_STRIP_NUM):
 midi_controller = MidiController(
     control_buttons=controls,
     np=np_array,
-    encoder=encoder,
     display=display,
     midi_map=MIDI_MAP,
     pattern_map=PATTERN_MAP,
     send_mode_msg=SEND_MODE_MSG,
     remember_snap=REMEMBER_SNAP,
+    control_encoder=control_encoder,
+    menu_button=menu_button,
+    value_params=VALUE_PARAMS,
+    value_hang_ms=VALUE_HANG_MS,
 )
 
 while True:

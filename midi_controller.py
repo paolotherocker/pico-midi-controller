@@ -1,7 +1,12 @@
 from utils.neopixelmanager import NeoPixelManager, Pattern, Off
-from utils.ky040 import KY040
 from utils.midi import Message, ControlChange
-from control_button import ControlButton, ControlAction, LEDMode
+from control_hardware import (
+    ControlButton,
+    ControlEncoder,
+    MenuButton,
+    ControlAction,
+    LEDMode,
+)
 from tm1637 import TM1637
 from collections import deque
 import time
@@ -176,7 +181,6 @@ class PresetManager:
             delta, self._msg_value = -1, self.midi_map.PRESET_DOWN_VAL
 
         self._value += delta
-
         # Wrap around 1 and the maximum
         if self._value < 1:
             self._value = self.preset_num
@@ -266,29 +270,130 @@ class LooperManager:
         return self.pattern_map.LOOPER_EMPTY
 
 
+class ValueParam:
+    """One assignable value target: display label, MIDI CC destination
+    and value range."""
+
+    def __init__(
+        self,
+        label: str,
+        cc: int,
+        min_value: int = 0,
+        max_value: int = 100,
+        step: int = 1,
+        initial: int = 0,
+        channel: int = None,
+    ):
+        """
+        Args:
+            label (str): Single character shown on the display, e.g. "V".
+            cc (int): MIDI CC controller number to send.
+            min_value (int, optional): Lower bound. Defaults to 0.
+            max_value (int, optional): Upper bound. Defaults to 100.
+            step (int, optional): Change per VALUE_UP/VALUE_DOWN. Defaults to 1.
+            initial (int, optional): Starting value. Defaults to 0.
+            channel (int, optional): Overrides ValueManager's default
+                channel for this param if set. Defaults to None.
+        """
+        self.label = label
+        self.cc = cc
+        self.channel = channel
+        self.min_value = min_value
+        self.max_value = max_value
+        self.step = step
+        self.value = initial
+
+
+class ValueManager:
+    """Owns the values of one or more ValueParam targets and which one is
+    currently selected.
+
+    exec_action() handles VALUE_TOGGLE (cycle to the next target) and
+    VALUE_UP/VALUE_DOWN (adjust the current target's value), from any
+    control hardware that reports those ControlActions -- an encoder for
+    up/down, a button for toggle, or otherwise. msg() retrieves the
+    resulting MIDI message. is_active() reports whether a change
+    happened recently, for the caller to decide what the display shows.
+    """
+
+    def __init__(
+        self, midi_map: MidiMap, params: list[ValueParam], hang_ms: int = 1000
+    ):
+        if not params:
+            raise ValueError("ValueManager needs at least one ValueParam")
+        self.midi_map = midi_map
+        self.params = params
+        self.hang_ms = hang_ms
+        self._index = 0
+        self._last_change_ms = 0
+
+    def exec_action(self, control_action: ControlAction):
+        """Handle a VALUE_TOGGLE/VALUE_UP/VALUE_DOWN action. Retrieve the
+        resulting MIDI message via msg()."""
+        if control_action == ControlAction.VALUE_TOGGLE:
+            self._index = (self._index + 1) % len(self.params)
+        else:
+            param = self.params[self._index]
+            delta = (
+                param.step if control_action == ControlAction.VALUE_UP else -param.step
+            )
+            param.value = max(
+                param.min_value, min(param.max_value, param.value + delta)
+            )
+
+        self._last_change_ms = time.ticks_ms()
+
+    def msg(self) -> ControlChange:
+        param = self.params[self._index]
+        return ControlChange(
+            channel=(
+                param.channel if param.channel is not None else self.midi_map.CHANNEL
+            ),
+            controller=param.cc,
+            value=param.value,
+        )
+
+    def is_active(self) -> bool:
+        return time.ticks_diff(time.ticks_ms(), self._last_change_ms) < self.hang_ms
+
+    def display_str(self) -> str:
+        """Formatted "<label><value>" string, e.g. "V068"."""
+        param = self.params[self._index]
+        return "{}{:03d}".format(param.label, param.value)
+
+
 class MidiController:
-    """Manages the control buttons, LEDs and the rotary encoder to generate MIDI messages"""
+    """Manages the control buttons, LEDs, display and rotary encoder to
+    generate MIDI messages"""
 
     _PATCH_MAP = [" ", "A", "B", "C", "D", "E", "F", "G", "H"]
+
+    _VALUE_ACTIONS = (
+        ControlAction.VALUE_UP,
+        ControlAction.VALUE_DOWN,
+        ControlAction.VALUE_TOGGLE,
+    )
 
     def __init__(
         self,
         control_buttons: list[ControlButton],
         np: NeoPixelManager,
-        encoder: KY040,
         display: TM1637,
         midi_map: MidiMap,
         preset_num: int = 8,
         pattern_map: PatternMap = PatternMap(),
         send_mode_msg: bool = False,
         remember_snap: bool = False,
+        control_encoder: ControlEncoder = None,
+        menu_button: MenuButton = None,
+        value_params: list[ValueParam] = None,
+        value_hang_ms: int = 1000,
     ):
         """Build Midi Controller object. Only pass pre-allocated and initialised objects
 
         Args:
             control_buttons (list[ControlButton]): list of ControlButton objects
             np (NeoPixelManager): Neo pixel array manager
-            encoder (Rotary): Rotary encoder
             display (TM1637): TM1637 display manager
             midi_map (MidiMap): Midi map with pre-set values
             preset_num (int, optional): Maximum number of presets. Defaults to 8.
@@ -298,15 +403,31 @@ class MidiController:
                 time a snap message is being sent
             remember_snap (bool): Sends a snap message every time a preset msg is
                 sent, to make sure the device switches to the same snap number
+            control_encoder (ControlEncoder, optional): Rotary encoder reporting
+                VALUE_UP/VALUE_DOWN. Defaults to None.
+            menu_button (MenuButton, optional): Button reporting VALUE_TOGGLE
+                (e.g. wired to the encoder's switch). Defaults to None.
+            value_params (list[ValueParam], optional): Assignable CC targets,
+                cycled by VALUE_TOGGLE. Required if control_encoder or
+                menu_button is set.
+            value_hang_ms (int, optional): How long the value display stays up
+                after the last change. Defaults to 1000.
         """
         self.control_buttons = control_buttons
         self.np = np
-        self.encoder = encoder
         self.display = display
         self.midi_map = midi_map
         self.pattern_map = pattern_map
         self.send_mode_msg = send_mode_msg
         self.remember_snap = remember_snap
+        self.control_encoder = control_encoder
+        self.menu_button = menu_button
+
+        self.value = (
+            ValueManager(midi_map=midi_map, params=value_params, hang_ms=value_hang_ms)
+            if value_params is not None
+            else None
+        )
 
         # Manager instances
         self.snap = SnapManager(midi_map=midi_map, pattern_map=pattern_map)
@@ -319,6 +440,11 @@ class MidiController:
 
         self.display.brightness(3)
         self.display.show("")
+
+    def _handle_value_action(self, action: ControlAction):
+        if self.value and action in self._VALUE_ACTIONS:
+            self.value.exec_action(action)
+            self.msg_queue.append(self.value.msg())
 
     def update(self):
         for idx, ctrl in enumerate(self.control_buttons):
@@ -356,6 +482,15 @@ class MidiController:
                 self.looper.exec_action(action)
                 self.msg_queue.append(self.looper.msg())
 
+            else:
+                self._handle_value_action(action)
+
+        # Rotary encoder (VALUE_UP/VALUE_DOWN) and menu button (VALUE_TOGGLE)
+        if self.control_encoder:
+            self._handle_value_action(self.control_encoder.update())
+        if self.menu_button:
+            self._handle_value_action(self.menu_button.update())
+
         # Refresh NP
         for idx, ctrl in enumerate(self.control_buttons):
             if ctrl.led_mode == LEDMode.SNAP:
@@ -363,10 +498,13 @@ class MidiController:
             if ctrl.led_mode == LEDMode.LOOPER:
                 self.np.set_pattern(pattern=self.looper.pattern(), id=idx)
 
-        # Refresh Display
-        self.display.show(
-            f" {self._PATCH_MAP[self.preset.value()]} {self.snap.value()}"
-        )
+        # Refresh Display -- encoder value overrides preset/snap while active
+        if self.value and self.value.is_active():
+            self.display.show(self.value.display_str())
+        else:
+            self.display.show(
+                f" {self._PATCH_MAP[self.preset.value()]} {self.snap.value()}"
+            )
 
         self.np.poll()
 
