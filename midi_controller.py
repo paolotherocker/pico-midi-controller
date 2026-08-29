@@ -14,6 +14,20 @@ import time
 MIDI_INTERVAL_MS = 8
 
 
+def _clamp_byte(value: int) -> int:
+    """Clamp to the valid 7-bit MIDI data byte range (0-127)."""
+    if value is None:
+        return None
+    return max(0, min(127, value))
+
+
+def _clamp_channel(value: int) -> int:
+    """Clamp to the valid 4-bit MIDI channel range (0-15)."""
+    if value is None:
+        return None
+    return max(0, min(15, value))
+
+
 class MidiMap:
     CHANNEL: int
     SNAP_CC: int
@@ -41,17 +55,17 @@ class MidiMap:
         looper_undo_val: int = None,
         looper_clear_val: int = None,
     ):
-        self.CHANNEL = channel
-        self.SNAP_CC = snap_cc
-        self.SNAP_MODE_VAL = snap_mode_val
-        self.PRESET_CC = preset_cc
-        self.PRESET_UP_VAL = preset_up_val
-        self.PRESET_DOWN_VAL = preset_down_val
-        self.LOOPER_CC = looper_cc
-        self.LOOPER_RO_VAL = looper_ro_val
-        self.LOOPER_SP_VAL = looper_sp_val
-        self.LOOPER_UNDO_VAL = looper_undo_val
-        self.LOOPER_CLEAR_VAL = looper_clear_val
+        self.CHANNEL = _clamp_channel(channel)
+        self.SNAP_CC = _clamp_byte(snap_cc)
+        self.SNAP_MODE_VAL = _clamp_byte(snap_mode_val)
+        self.PRESET_CC = _clamp_byte(preset_cc)
+        self.PRESET_UP_VAL = _clamp_byte(preset_up_val)
+        self.PRESET_DOWN_VAL = _clamp_byte(preset_down_val)
+        self.LOOPER_CC = _clamp_byte(looper_cc)
+        self.LOOPER_RO_VAL = _clamp_byte(looper_ro_val)
+        self.LOOPER_SP_VAL = _clamp_byte(looper_sp_val)
+        self.LOOPER_UNDO_VAL = _clamp_byte(looper_undo_val)
+        self.LOOPER_CLEAR_VAL = _clamp_byte(looper_clear_val)
 
 
 class PatternMap:
@@ -296,12 +310,12 @@ class ValueParam:
                 channel for this param if set. Defaults to None.
         """
         self.label = label
-        self.cc = cc
-        self.channel = channel
-        self.min_value = min_value
-        self.max_value = max_value
-        self.step = step
-        self.value = initial
+        self.cc = _clamp_byte(cc)
+        self.channel = _clamp_channel(channel)
+        self.min_value = _clamp_byte(min_value)
+        self.max_value = _clamp_byte(max_value)
+        self.step = max(1, step)
+        self.value = max(self.min_value, min(self.max_value, _clamp_byte(initial)))
 
 
 class ValueManager:
