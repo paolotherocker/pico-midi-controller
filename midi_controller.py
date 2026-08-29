@@ -1,12 +1,6 @@
 from utils.neopixelmanager import NeoPixelManager, Pattern, Off
 from utils.midi import Message, ControlChange
-from control_hardware import (
-    Control,
-    ControlButton,
-    ControlEncoder,
-    ControlAction,
-    LEDMode,
-)
+from control_hardware import Control, ControlButton, ControlEncoder, ControlAction, LEDMode
 from tm1637 import TM1637
 from collections import deque
 import time
@@ -31,6 +25,15 @@ def _clamp_channel(value: int) -> int:
     return max(0, min(15, value))
 
 
+class ConfigError:
+    """Error codes shown on the display when MidiController finds an
+    invalid configuration at startup."""
+
+    LED_MAP_SIZE = 1
+    VALUE_RANGE = 2
+    VALUE_UNCONFIGURED = 3
+
+
 class MidiMap:
     CHANNEL: int
     SNAP_CC: int
@@ -52,11 +55,11 @@ class MidiMap:
         preset_cc: int,
         preset_up_val: int,
         preset_down_val: int,
-        looper_cc: int = None,
-        looper_ro_val: int = None,
-        looper_sp_val: int = None,
-        looper_undo_val: int = None,
-        looper_clear_val: int = None,
+        looper_cc: int,
+        looper_ro_val: int,
+        looper_sp_val: int,
+        looper_undo_val: int,
+        looper_clear_val: int,
     ):
         self.CHANNEL = _clamp_channel(channel)
         self.SNAP_CC = _clamp_byte(snap_cc)
@@ -318,9 +321,7 @@ class ValueManager:
     """Tracks a list of value targets and which one is currently
     selected."""
 
-    def __init__(
-        self, midi_map: MidiMap, params: list[ValueParam], hang_ms: int = 1000
-    ):
+    def __init__(self, midi_map: MidiMap, params: list[ValueParam], hang_ms: int = 1000):
         """
         Args:
             midi_map (MidiMap): MIDI channel configuration.
@@ -343,21 +344,15 @@ class ValueManager:
             self._index = (self._index + 1) % len(self.params)
         else:
             param = self.params[self._index]
-            delta = (
-                param.step if control_action == ControlAction.VALUE_UP else -param.step
-            )
-            param.value = max(
-                param.min_value, min(param.max_value, param.value + delta)
-            )
+            delta = param.step if control_action == ControlAction.VALUE_UP else -param.step
+            param.value = max(param.min_value, min(param.max_value, param.value + delta))
 
         self._last_change_ms = time.ticks_ms()
 
     def msg(self) -> ControlChange:
         param = self.params[self._index]
         return ControlChange(
-            channel=(
-                param.channel if param.channel is not None else self.midi_map.CHANNEL
-            ),
+            channel=param.channel if param.channel is not None else self.midi_map.CHANNEL,
             controller=param.cc,
             value=param.value,
         )
@@ -375,6 +370,26 @@ class ValueManager:
 class MidiController:
     """Generates MIDI messages from control hardware, and refreshes the
     LEDs and display."""
+
+    _SNAP_ACTIONS = (
+        ControlAction.SNAP_1_2,
+        ControlAction.SNAP_3_4,
+        ControlAction.SNAP_5_6,
+        ControlAction.SNAP_7_8,
+    )
+
+    _LOOPER_ACTIONS = (
+        ControlAction.LOOPER_REC_OD,
+        ControlAction.LOOPER_STOP_PLAY,
+        ControlAction.LOOPER_UNDO,
+        ControlAction.LOOPER_CLEAR,
+    )
+
+    _VALUE_ACTIONS = (
+        ControlAction.VALUE_UP,
+        ControlAction.VALUE_DOWN,
+        ControlAction.VALUE_TOGGLE,
+    )
 
     def __init__(
         self,
@@ -412,6 +427,11 @@ class MidiController:
                 Defaults to None.
             value_hang_ms (int, optional): How long a value stays on the
                 display after changing. Defaults to 1000.
+
+        Raises:
+            RuntimeError: If the configuration is invalid. All NeoPixel
+                groups are turned off and the display shows "E<code>"
+                (see ConfigError) before raising.
         """
         self.np = np
         self.display = display
@@ -435,6 +455,8 @@ class MidiController:
         if control_encoder is not None:
             self._hardware.append(control_encoder)
 
+        self._validate_config(control_buttons, control_encoder, value_params)
+
         # MIDI message queue
         self.msg_queue = deque((), 25)
         self.msg_time: int = 0
@@ -442,17 +464,61 @@ class MidiController:
         self.display.brightness(3)
         self.display.show("")
 
+    def _configured_actions(
+        self, control_buttons: list[ControlButton], control_encoder: ControlEncoder
+    ) -> set:
+        """Every ControlAction assigned to any piece of control hardware."""
+        actions = set()
+        for ctrl in control_buttons:
+            actions.add(ctrl.action_pressed)
+            actions.add(ctrl.action_short)
+            actions.add(ctrl.action_long)
+        if control_encoder is not None:
+            actions.add(control_encoder.action_cw)
+            actions.add(control_encoder.action_ccw)
+        return actions
+
+    def _fail(self, code: int):
+        """Turns off all NeoPixel groups, shows an error code on the
+        display, and halts startup."""
+        self.np.clear()
+        self.np.write()
+        self.display.show("E{:03d}".format(code))
+        raise RuntimeError("MidiController config error E{:03d}".format(code))
+
+    def _validate_config(
+        self,
+        control_buttons: list[ControlButton],
+        control_encoder: ControlEncoder,
+        value_params: list[ValueParam],
+    ):
+        """Checks for configuration problems serious enough to prevent
+        starting, and shows an error code instead of failing later."""
+        # led_map must fit within the NeoPixel array's actual groups
+        try:
+            for np_id in range(len(self.led_map)):
+                self.np.set_pattern(pattern=Off(), id=np_id)
+        except Exception:
+            self._fail(ConfigError.LED_MAP_SIZE)
+
+        configured = self._configured_actions(control_buttons, control_encoder)
+
+        # Value actions need value_params to be set
+        if configured & set(self._VALUE_ACTIONS) and self.value is None:
+            self._fail(ConfigError.VALUE_UNCONFIGURED)
+
+        # Each value target's range must make sense
+        if value_params:
+            for param in value_params:
+                if param.min_value > param.max_value:
+                    self._fail(ConfigError.VALUE_RANGE)
+
     def _handle_action(self, action: ControlAction):
         """Handles a single action."""
         if action == ControlAction.NONE:
             return
 
-        if action in (
-            ControlAction.SNAP_1_2,
-            ControlAction.SNAP_3_4,
-            ControlAction.SNAP_5_6,
-            ControlAction.SNAP_7_8,
-        ):
+        if action in self._SNAP_ACTIONS:
             self.snap.exec_action(action)
             if self.send_mode_msg == True:
                 self.msg_queue.append(self.snap.snap_mode_msg())
@@ -464,20 +530,11 @@ class MidiController:
             if self.remember_snap == True:
                 self.msg_queue.append(self.snap.msg())
 
-        elif action in (
-            ControlAction.LOOPER_REC_OD,
-            ControlAction.LOOPER_STOP_PLAY,
-            ControlAction.LOOPER_UNDO,
-            ControlAction.LOOPER_CLEAR,
-        ):
+        elif action in self._LOOPER_ACTIONS:
             self.looper.exec_action(action)
             self.msg_queue.append(self.looper.msg())
 
-        elif action in (
-            ControlAction.VALUE_UP,
-            ControlAction.VALUE_DOWN,
-            ControlAction.VALUE_TOGGLE,
-        ):
+        elif action in self._VALUE_ACTIONS:
             if self.value:
                 self.value.exec_action(action)
                 self.msg_queue.append(self.value.msg())
