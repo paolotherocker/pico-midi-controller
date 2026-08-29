@@ -81,7 +81,6 @@ class PatternMap:
     LOOPER_PLAYING: Pattern
     LOOPER_OVERDUBBING: Pattern
     LOOPER_STOPPED: Pattern
-    HOLD: Pattern
 
     def __init__(
         self,
@@ -94,7 +93,6 @@ class PatternMap:
         looper_playing: Pattern = Off(),
         looper_overdubbing: Pattern = Off(),
         looper_stopped: Pattern = Off(),
-        hold: Pattern = Off(),
     ):
         self.SNAP_ACTIVE = snap_active
         self.SNAP_ACTIVE_SEC = snap_active_sec
@@ -105,7 +103,6 @@ class PatternMap:
         self.LOOPER_PLAYING = looper_playing
         self.LOOPER_OVERDUBBING = looper_overdubbing
         self.LOOPER_STOPPED = looper_stopped
-        self.HOLD = hold
 
 
 class SnapManager:
@@ -383,7 +380,8 @@ class MidiController:
     _PATCH_MAP = [" ", "A", "B", "C", "D", "E", "F", "G", "H"]
 
     # Converts an led_map entry into the SnapManager id it corresponds to,
-    # so led_map can list SNAP_1_2/SNAP_3_4/etc in any order
+    # so led_map can list SNAP_1_2/SNAP_3_4/etc in any order regardless of
+    # which control_buttons id actually drives each group.
     _SNAP_MODE_TO_ID = {
         LEDMode.SNAP_1_2: 0,
         LEDMode.SNAP_3_4: 1,
@@ -418,13 +416,15 @@ class MidiController:
             midi_map (MidiMap): Midi map with pre-set values
             preset_num (int, optional): Maximum number of presets. Defaults to 8.
             pattern_map (PatternMap, optional): LED patterns for every mode
-                (SNAP, LOOPER, HOLD). Defaults to all off.
+                (SNAP, LOOPER). Defaults to all off.
             send_mode_msg (bool): Send a snap mode msg to switch to snap mode every
                 time a snap message is being sent
             remember_snap (bool): Sends a snap message every time a preset msg is
                 sent, to make sure the device switches to the same snap number
             led_map (list[LEDMode], optional): One entry per NeoPixel group, in NP
-                index order.
+                index order. SNAP_1_2/SNAP_3_4/SNAP_5_6/SNAP_7_8 can appear in any
+                order -- converted to the matching SnapManager id internally.
+                Fully decoupled from control_buttons.
             control_encoder (ControlEncoder, optional): Rotary encoder reporting
                 VALUE_UP/VALUE_DOWN. Defaults to None.
             value_params (list[ValueParam], optional): Assignable CC targets,
@@ -433,14 +433,11 @@ class MidiController:
             value_hang_ms (int, optional): How long the value display stays up
                 after the last change. Defaults to 1000.
         """
-        self.control_buttons = control_buttons
         self.np = np
         self.display = display
-        self.midi_map = midi_map
         self.pattern_map = pattern_map
         self.send_mode_msg = send_mode_msg
         self.remember_snap = remember_snap
-        self.control_encoder = control_encoder
         self.led_map = led_map or []
 
         self.value = (
@@ -489,9 +486,6 @@ class MidiController:
             self.msg_queue.append(self.preset.msg())
             if self.remember_snap == True:
                 self.msg_queue.append(self.snap.msg())
-
-        elif action == ControlAction.HOLD:
-            self.np.set_pattern(pattern=self.pattern_map.HOLD, id=id)
 
         elif action in (
             ControlAction.LOOPER_REC_OD,

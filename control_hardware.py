@@ -6,20 +6,19 @@ class ControlAction:
     """Action that can be executed by a Button Event"""
 
     NONE = 0
-    HOLD = 1
-    SNAP_1_2 = 2
-    SNAP_3_4 = 3
-    SNAP_5_6 = 4
-    SNAP_7_8 = 5
-    PRESET_UP = 6
-    PRESET_DOWN = 7
-    LOOPER_REC_OD = 8
-    LOOPER_STOP_PLAY = 9
-    LOOPER_UNDO = 10
-    LOOPER_CLEAR = 11
-    VALUE_UP = 12
-    VALUE_DOWN = 13
-    VALUE_TOGGLE = 14
+    SNAP_1_2 = 1
+    SNAP_3_4 = 2
+    SNAP_5_6 = 3
+    SNAP_7_8 = 4
+    PRESET_UP = 5
+    PRESET_DOWN = 6
+    LOOPER_REC_OD = 7
+    LOOPER_STOP_PLAY = 8
+    LOOPER_UNDO = 9
+    LOOPER_CLEAR = 10
+    VALUE_UP = 11
+    VALUE_DOWN = 12
+    VALUE_TOGGLE = 13
 
 
 class LEDMode:
