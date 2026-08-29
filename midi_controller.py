@@ -26,12 +26,13 @@ def _clamp_channel(value: int) -> int:
 
 
 class ConfigError:
-    """Error codes shown on the display when MidiController finds an
-    invalid configuration at startup."""
+    """Error codes shown on the display when MidiController detects a
+    problem it can't safely continue from."""
 
     LED_MAP_SIZE = 1
     VALUE_RANGE = 2
     VALUE_UNCONFIGURED = 3
+    QUEUE_OVERFLOW = 4
 
 
 class MidiMap:
@@ -371,6 +372,8 @@ class MidiController:
     """Generates MIDI messages from control hardware, and refreshes the
     LEDs and display."""
 
+    _MSG_QUEUE_MAXLEN = 256
+
     _SNAP_ACTIONS = (
         ControlAction.SNAP_1_2,
         ControlAction.SNAP_3_4,
@@ -429,9 +432,10 @@ class MidiController:
                 display after changing. Defaults to 1000.
 
         Raises:
-            RuntimeError: If the configuration is invalid. All NeoPixel
-                groups are turned off and the display shows "E<code>"
-                (see ConfigError) before raising.
+            RuntimeError: If the configuration is invalid, or the message
+                queue overflows during operation. All NeoPixel groups are
+                turned off and the display shows "E<code>" (see
+                ConfigError) before raising.
         """
         self.np = np
         self.display = display
@@ -458,7 +462,7 @@ class MidiController:
         self._validate_config(control_buttons, control_encoder, value_params)
 
         # MIDI message queue
-        self.msg_queue = deque((), 25)
+        self.msg_queue = deque((), self._MSG_QUEUE_MAXLEN)
         self.msg_time: int = 0
 
         self.display.brightness(3)
@@ -480,11 +484,11 @@ class MidiController:
 
     def _fail(self, code: int):
         """Turns off all NeoPixel groups, shows an error code on the
-        display, and halts startup."""
+        display, and halts."""
         self.np.clear()
         self.np.write()
         self.display.show("E{:03d}".format(code))
-        raise RuntimeError("MidiController config error E{:03d}".format(code))
+        raise RuntimeError("MidiController error E{:03d}".format(code))
 
     def _validate_config(
         self,
@@ -538,6 +542,9 @@ class MidiController:
             if self.value:
                 self.value.exec_action(action)
                 self.msg_queue.append(self.value.msg())
+
+        if len(self.msg_queue) >= self._MSG_QUEUE_MAXLEN:
+            self._fail(ConfigError.QUEUE_OVERFLOW)
 
     def update(self):
         for ctrl in self._hardware:
