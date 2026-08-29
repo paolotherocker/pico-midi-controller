@@ -90,7 +90,6 @@ controls = []
 for i in range(4):
     controls.append(
         ControlButton(
-            id=i,
             pin=P_CONTROLS[i],
             action_pressed=CONTROLS_MAP[i][0],
             action_short=CONTROLS_MAP[i][1],
@@ -99,20 +98,16 @@ for i in range(4):
     )
 
 # Encoder switch and extra menu buttons
+controls.append(ControlButton(pin=P_ROTARY_SW, action_long=ControlAction.VALUE_TOGGLE))
 controls.append(
-    ControlButton(id=4, pin=P_ROTARY_SW, action_long=ControlAction.VALUE_TOGGLE)
+    ControlButton(pin=P_MENU_BUTTONS[0], action_pressed=ControlAction.PRESET_UP)
 )
 controls.append(
-    ControlButton(id=10, pin=P_MENU_BUTTONS[0], action_pressed=ControlAction.PRESET_UP)
-)
-controls.append(
-    ControlButton(
-        id=11, pin=P_MENU_BUTTONS[1], action_pressed=ControlAction.PRESET_DOWN
-    )
+    ControlButton(pin=P_MENU_BUTTONS[1], action_pressed=ControlAction.PRESET_DOWN)
 )
 
 # Rotary encoder
-control_encoder = ControlEncoder(id=20, dt_pin=P_ROTARY_DT, clk_pin=P_ROTARY_CLK)
+control_encoder = ControlEncoder(dt_pin=P_ROTARY_DT, clk_pin=P_ROTARY_CLK)
 
 display = TM1637(clk=Pin(P_DISP_CLK), dio=Pin(P_DISP_DIO))
 

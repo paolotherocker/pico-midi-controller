@@ -35,10 +35,6 @@ class LEDMode:
 class Control:
     """Base class for control hardware."""
 
-    def id(self) -> int:
-        """Returns this control's identifier."""
-        raise NotImplementedError
-
     def update(self) -> ControlAction:
         """Polls the hardware and returns the resulting action."""
         raise NotImplementedError
@@ -49,7 +45,6 @@ class ControlButton(Control):
 
     def __init__(
         self,
-        id: int,
         pin: int,
         action_pressed: ControlAction = ControlAction.NONE,
         action_short: ControlAction = ControlAction.NONE,
@@ -59,7 +54,6 @@ class ControlButton(Control):
     ):
         """
         Args:
-            id (int): Identifier for this button.
             pin (int): GPIO pin number.
             action_pressed (ControlAction, optional): Reported on press.
             action_short (ControlAction, optional): Reported on short press.
@@ -67,14 +61,10 @@ class ControlButton(Control):
             debounce_ms (int, optional): Debounce time. Defaults to 10.
             long_press_ms (int, optional): Long press threshold. Defaults to 600.
         """
-        self._id = id
         self._button = Button(pin, debounce_ms=debounce_ms, long_press_ms=long_press_ms)
         self.action_pressed = action_pressed
         self.action_short = action_short
         self.action_long = action_long
-
-    def id(self) -> int:
-        return self._id
 
     def update(self) -> ControlAction:
         event = self._button.consume()
@@ -94,7 +84,6 @@ class ControlEncoder(Control):
 
     def __init__(
         self,
-        id: int,
         dt_pin: int,
         clk_pin: int,
         action_cw: ControlAction = ControlAction.VALUE_UP,
@@ -103,7 +92,6 @@ class ControlEncoder(Control):
     ):
         """
         Args:
-            id (int): Identifier for this encoder.
             dt_pin (int): Encoder DT pin.
             clk_pin (int): Encoder CLK pin.
             action_cw (ControlAction, optional): Reported on CW rotation.
@@ -112,13 +100,9 @@ class ControlEncoder(Control):
                 Defaults to ControlAction.VALUE_DOWN.
             debounce_ms (int, optional): Debounce time. Defaults to 2.
         """
-        self._id = id
         self._encoder = KY040(dt_pin=dt_pin, clk_pin=clk_pin, debounce_ms=debounce_ms)
         self.action_cw = action_cw
         self.action_ccw = action_ccw
-
-    def id(self) -> int:
-        return self._id
 
     def update(self) -> ControlAction:
         event = self._encoder.consume()
