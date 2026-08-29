@@ -22,12 +22,7 @@ class ControlAction:
 
 
 class LEDMode:
-    """Behaviour descriptor for one entry in MidiController's led_map.
-
-    Not a property of any control hardware -- purely a NeoPixel-group
-    configuration, set separately from whatever button/encoder produces
-    the underlying state.
-    """
+    """Display mode for a NeoPixel group."""
 
     NONE = 0
     SNAP_1_2 = 1
@@ -38,33 +33,19 @@ class LEDMode:
 
 
 class Control:
-    """Base class for all control hardware (buttons, encoders, etc.).
-
-    Every subclass owns/builds its own hardware object(s) internally
-    (composition, not inheritance) and must implement id() and update()
-    so MidiController can poll any mix of hardware uniformly.
-    """
+    """Base class for control hardware."""
 
     def id(self) -> int:
-        """Identifier used by MidiController's managers and led_map to
-        tell hardware instances apart."""
+        """Returns this control's identifier."""
         raise NotImplementedError
 
     def update(self) -> ControlAction:
-        """Poll the underlying hardware and return the resulting
-        ControlAction, or ControlAction.NONE if nothing happened."""
+        """Polls the hardware and returns the resulting action."""
         raise NotImplementedError
 
 
 class ControlButton(Control):
-    """Thin event-to-action mapper.
-
-    Wraps a debounced Button and knows which ControlAction to report for
-    a press/short-press/long-press. Used for every physical button --
-    footswitches, standalone menu buttons, an encoder's built-in switch,
-    etc. LED behaviour is configured separately via MidiController's
-    led_map, not here.
-    """
+    """Reports an action for a button press, short press, or long press."""
 
     def __init__(
         self,
@@ -76,6 +57,16 @@ class ControlButton(Control):
         debounce_ms: int = 10,
         long_press_ms: int = 600,
     ):
+        """
+        Args:
+            id (int): Identifier for this button.
+            pin (int): GPIO pin number.
+            action_pressed (ControlAction, optional): Reported on press.
+            action_short (ControlAction, optional): Reported on short press.
+            action_long (ControlAction, optional): Reported on long press.
+            debounce_ms (int, optional): Debounce time. Defaults to 10.
+            long_press_ms (int, optional): Long press threshold. Defaults to 600.
+        """
         self._id = id
         self._button = Button(pin, debounce_ms=debounce_ms, long_press_ms=long_press_ms)
         self.action_pressed = action_pressed
@@ -99,11 +90,7 @@ class ControlButton(Control):
 
 
 class ControlEncoder(Control):
-    """Rotary encoder event-to-action mapper (the encoder counterpart to
-    ControlButton).
-
-    Reports action_cw/action_ccw for CW/CCW rotation.
-    """
+    """Reports an action for clockwise or counter-clockwise rotation."""
 
     def __init__(
         self,
@@ -116,15 +103,14 @@ class ControlEncoder(Control):
     ):
         """
         Args:
-            id (int): Identifier passed through to whatever manager handles
-                the resulting ControlAction.
+            id (int): Identifier for this encoder.
             dt_pin (int): Encoder DT pin.
             clk_pin (int): Encoder CLK pin.
             action_cw (ControlAction, optional): Reported on CW rotation.
                 Defaults to ControlAction.VALUE_UP.
             action_ccw (ControlAction, optional): Reported on CCW rotation.
                 Defaults to ControlAction.VALUE_DOWN.
-            debounce_ms (int, optional): Rotary debounce. Defaults to 2.
+            debounce_ms (int, optional): Debounce time. Defaults to 2.
         """
         self._id = id
         self._encoder = KY040(dt_pin=dt_pin, clk_pin=clk_pin, debounce_ms=debounce_ms)

@@ -64,6 +64,7 @@ CONTROLS_MAP = [
     [ControlAction.NONE, ControlAction.SNAP_7_8, ControlAction.NONE],
 ]
 
+# LED mode for each NeoPixel group, in order
 LED_MAP = [
     LEDMode.SNAP_1_2,
     LEDMode.SNAP_3_4,
@@ -76,8 +77,7 @@ SEND_MODE_MSG = True
 # Send a snap message every time a preset message is sent
 REMEMBER_SNAP = True
 
-# Rotary encoder assignable targets, cycled by VALUE_TOGGLE (the encoder's
-# switch, below). Edit freely to change what the encoder controls.
+# Rotary encoder value targets
 VALUE_PARAMS = [
     ValueParam(label="V", cc=7, min_value=0, max_value=100, initial=100),  # Volume
     ValueParam(label="A", cc=12, min_value=0, max_value=127, initial=0),  # Param A
@@ -98,7 +98,7 @@ for i in range(4):
         )
     )
 
-# Encoder switch + extra menu buttons -- plain ControlButtons, no LEDs
+# Encoder switch and extra menu buttons
 controls.append(
     ControlButton(id=4, pin=P_ROTARY_SW, action_long=ControlAction.VALUE_TOGGLE)
 )
@@ -111,7 +111,7 @@ controls.append(
     )
 )
 
-# Rotation reports VALUE_UP/VALUE_DOWN
+# Rotary encoder
 control_encoder = ControlEncoder(id=20, dt_pin=P_ROTARY_DT, clk_pin=P_ROTARY_CLK)
 
 display = TM1637(clk=Pin(P_DISP_CLK), dio=Pin(P_DISP_DIO))
