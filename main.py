@@ -10,7 +10,7 @@ from utils.neopixelmanager import NeoPixelManager, Pulse, Solid, Off
 import time
 from tm1637 import TM1637
 from midi_controller import MidiController, MidiMap, PatternMap, ValueParam
-from control_hardware import ControlButton, ControlEncoder, MenuButton, ControlAction, LEDMode
+from control_hardware import ControlButton, ControlEncoder, ControlAction, LEDMode
 
 # Main refresh interval
 UPDATE_INTERVAL = 5
@@ -64,7 +64,12 @@ CONTROLS_MAP = [
     [ControlAction.NONE, ControlAction.SNAP_7_8, ControlAction.NONE],
 ]
 
-LED_MAP = [LEDMode.SNAP, LEDMode.SNAP, LEDMode.SNAP, LEDMode.SNAP]
+LED_MAP = [
+    LEDMode.SNAP_1_2,
+    LEDMode.SNAP_3_4,
+    LEDMode.SNAP_5_6,
+    LEDMode.SNAP_7_8,
+]
 
 # Send a mode message every time a snap message is sent
 SEND_MODE_MSG = True
@@ -74,9 +79,9 @@ REMEMBER_SNAP = True
 # Rotary encoder assignable targets, cycled by VALUE_TOGGLE (the encoder's
 # switch, below). Edit freely to change what the encoder controls.
 VALUE_PARAMS = [
-    ValueParam(label="V", cc=7, min_value=0, max_value=100, initial=64),   # Volume
-    ValueParam(label="A", cc=12, min_value=0, max_value=100, initial=0),  # Param A
-    ValueParam(label="B", cc=13, min_value=0, max_value=100, initial=0),  # Param B
+    ValueParam(label="V", cc=7, min_value=0, max_value=100, initial=100),  # Volume
+    ValueParam(label="A", cc=12, min_value=0, max_value=127, initial=0),  # Param A
+    ValueParam(label="B", cc=13, min_value=0, max_value=127, initial=0),  # Param B
 ]
 # How long (ms) the value stays on screen after the last change
 VALUE_HANG_MS = 1000
@@ -90,20 +95,24 @@ for i in range(4):
             action_pressed=CONTROLS_MAP[i][0],
             action_short=CONTROLS_MAP[i][1],
             action_long=CONTROLS_MAP[i][2],
-            led_mode=LED_MAP[i],
         )
     )
 
-# Rotation reports VALUE_UP/VALUE_DOWN
-control_encoder = ControlEncoder(id=0, dt_pin=P_ROTARY_DT, clk_pin=P_ROTARY_CLK)
+# Encoder switch + extra menu buttons -- plain ControlButtons, no LEDs
+controls.append(
+    ControlButton(id=4, pin=P_ROTARY_SW, action_long=ControlAction.VALUE_TOGGLE)
+)
+controls.append(
+    ControlButton(id=10, pin=P_MENU_BUTTONS[0], action_pressed=ControlAction.PRESET_UP)
+)
+controls.append(
+    ControlButton(
+        id=11, pin=P_MENU_BUTTONS[1], action_pressed=ControlAction.PRESET_DOWN
+    )
+)
 
-# All non-LED buttons in one list: the encoder's switch (VALUE_TOGGLE,
-# cycles VALUE_PARAMS) plus the two extra menu buttons (preset up/down)
-menu_buttons = [
-    MenuButton(id=0, pin=P_ROTARY_SW, action_pressed=ControlAction.VALUE_TOGGLE),
-    MenuButton(id=10, pin=P_MENU_BUTTONS[0], action_pressed=ControlAction.PRESET_UP),
-    MenuButton(id=11, pin=P_MENU_BUTTONS[1], action_pressed=ControlAction.PRESET_DOWN),
-]
+# Rotation reports VALUE_UP/VALUE_DOWN
+control_encoder = ControlEncoder(id=20, dt_pin=P_ROTARY_DT, clk_pin=P_ROTARY_CLK)
 
 display = TM1637(clk=Pin(P_DISP_CLK), dio=Pin(P_DISP_DIO))
 
@@ -119,8 +128,8 @@ midi_controller = MidiController(
     pattern_map=PATTERN_MAP,
     send_mode_msg=SEND_MODE_MSG,
     remember_snap=REMEMBER_SNAP,
+    led_map=LED_MAP,
     control_encoder=control_encoder,
-    menu_buttons=menu_buttons,
     value_params=VALUE_PARAMS,
     value_hang_ms=VALUE_HANG_MS,
 )

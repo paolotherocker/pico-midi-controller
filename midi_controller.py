@@ -1,6 +1,12 @@
 from utils.neopixelmanager import NeoPixelManager, Pattern, Off
 from utils.midi import Message, ControlChange
-from control_hardware import Control, ControlButton, ControlEncoder, MenuButton, ControlAction, LEDMode
+from control_hardware import (
+    Control,
+    ControlButton,
+    ControlEncoder,
+    ControlAction,
+    LEDMode,
+)
 from tm1637 import TM1637
 from collections import deque
 import time
@@ -197,7 +203,7 @@ class LooperManager:
 
     LOOPER_REC_OD, LOOPER_STOP_PLAY, LOOPER_UNDO and LOOPER_CLEAR are typically wired to separate
     physical footswitches, but they all act on the same loop, so every
-    button tagged LEDMode.LOOPER is driven from this one shared state
+    entry tagged LEDMode.LOOPER is driven from this one shared state
     rather than each switch tracking its own local flag.
     """
 
@@ -310,7 +316,9 @@ class ValueManager:
     happened recently, for the caller to decide what the display shows.
     """
 
-    def __init__(self, midi_map: MidiMap, params: list[ValueParam], hang_ms: int = 1000):
+    def __init__(
+        self, midi_map: MidiMap, params: list[ValueParam], hang_ms: int = 1000
+    ):
         if not params:
             raise ValueError("ValueManager needs at least one ValueParam")
         self.midi_map = midi_map
@@ -326,15 +334,21 @@ class ValueManager:
             self._index = (self._index + 1) % len(self.params)
         else:
             param = self.params[self._index]
-            delta = param.step if control_action == ControlAction.VALUE_UP else -param.step
-            param.value = max(param.min_value, min(param.max_value, param.value + delta))
+            delta = (
+                param.step if control_action == ControlAction.VALUE_UP else -param.step
+            )
+            param.value = max(
+                param.min_value, min(param.max_value, param.value + delta)
+            )
 
         self._last_change_ms = time.ticks_ms()
 
     def msg(self) -> ControlChange:
         param = self.params[self._index]
         return ControlChange(
-            channel=param.channel if param.channel is not None else self.midi_map.CHANNEL,
+            channel=(
+                param.channel if param.channel is not None else self.midi_map.CHANNEL
+            ),
             controller=param.cc,
             value=param.value,
         )
@@ -354,11 +368,14 @@ class MidiController:
 
     _PATCH_MAP = [" ", "A", "B", "C", "D", "E", "F", "G", "H"]
 
-    _VALUE_ACTIONS = (
-        ControlAction.VALUE_UP,
-        ControlAction.VALUE_DOWN,
-        ControlAction.VALUE_TOGGLE,
-    )
+    # Converts an led_map entry into the SnapManager id it corresponds to,
+    # so led_map can list SNAP_1_2/SNAP_3_4/etc in any order
+    _SNAP_MODE_TO_ID = {
+        LEDMode.SNAP_1_2: 0,
+        LEDMode.SNAP_3_4: 1,
+        LEDMode.SNAP_5_6: 2,
+        LEDMode.SNAP_7_8: 3,
+    }
 
     def __init__(
         self,
@@ -370,15 +387,18 @@ class MidiController:
         pattern_map: PatternMap = PatternMap(),
         send_mode_msg: bool = False,
         remember_snap: bool = False,
+        led_map: list[LEDMode] = None,
         control_encoder: ControlEncoder = None,
-        menu_buttons: list[MenuButton] = None,
         value_params: list[ValueParam] = None,
         value_hang_ms: int = 1000,
     ):
         """Build Midi Controller object. Only pass pre-allocated and initialised objects
 
         Args:
-            control_buttons (list[ControlButton]): list of ControlButton objects
+            control_buttons (list[ControlButton]): every physical button --
+                footswitches, standalone menu buttons, an encoder's switch, etc.
+                A footswitch driving SNAP_1_2/3_4/5_6/7_8 must use the id from
+                _SNAP_MODE_TO_ID (0/1/2/3) matching that group.
             np (NeoPixelManager): Neo pixel array manager
             display (TM1637): TM1637 display manager
             midi_map (MidiMap): Midi map with pre-set values
@@ -389,14 +409,13 @@ class MidiController:
                 time a snap message is being sent
             remember_snap (bool): Sends a snap message every time a preset msg is
                 sent, to make sure the device switches to the same snap number
+            led_map (list[LEDMode], optional): One entry per NeoPixel group, in NP
+                index order.
             control_encoder (ControlEncoder, optional): Rotary encoder reporting
                 VALUE_UP/VALUE_DOWN. Defaults to None.
-            menu_buttons (list[MenuButton], optional): Buttons with no LED group,
-                e.g. the encoder's switch (VALUE_TOGGLE) plus any standalone menu
-                buttons. Defaults to None.
             value_params (list[ValueParam], optional): Assignable CC targets,
                 cycled by VALUE_TOGGLE. Required if control_encoder or any
-                menu_button reports VALUE_UP/VALUE_DOWN/VALUE_TOGGLE.
+                control_button reports VALUE_UP/VALUE_DOWN/VALUE_TOGGLE.
             value_hang_ms (int, optional): How long the value display stays up
                 after the last change. Defaults to 1000.
         """
@@ -408,7 +427,7 @@ class MidiController:
         self.send_mode_msg = send_mode_msg
         self.remember_snap = remember_snap
         self.control_encoder = control_encoder
-        self.menu_buttons = menu_buttons or []
+        self.led_map = led_map or []
 
         self.value = (
             ValueManager(midi_map=midi_map, params=value_params, hang_ms=value_hang_ms)
@@ -423,7 +442,7 @@ class MidiController:
 
         # Every piece of control hardware (all Control subclasses), polled
         # uniformly in update()
-        self._hardware: list[Control] = list(control_buttons) + self.menu_buttons
+        self._hardware: list[Control] = list(control_buttons)
         if control_encoder is not None:
             self._hardware.append(control_encoder)
 
@@ -469,7 +488,11 @@ class MidiController:
             self.looper.exec_action(action)
             self.msg_queue.append(self.looper.msg())
 
-        elif action in self._VALUE_ACTIONS:
+        elif action in (
+            ControlAction.VALUE_UP,
+            ControlAction.VALUE_DOWN,
+            ControlAction.VALUE_TOGGLE,
+        ):
             if self.value:
                 self.value.exec_action(action)
                 self.msg_queue.append(self.value.msg())
@@ -478,12 +501,14 @@ class MidiController:
         for ctrl in self._hardware:
             self._handle_action(ctrl.id(), ctrl.update())
 
-        # Refresh NP
-        for ctrl in self.control_buttons:
-            if ctrl.led_mode == LEDMode.SNAP:
-                self.np.set_pattern(pattern=self.snap.pattern(ctrl.id()), id=ctrl.id())
-            if ctrl.led_mode == LEDMode.LOOPER:
-                self.np.set_pattern(pattern=self.looper.pattern(), id=ctrl.id())
+        # Refresh NP -- driven entirely by led_map, never by control_buttons.
+        # led_mode is converted to the matching SnapManager id via the table.
+        for np_id, led_mode in enumerate(self.led_map):
+            snap_id = self._SNAP_MODE_TO_ID.get(led_mode)
+            if snap_id is not None:
+                self.np.set_pattern(pattern=self.snap.pattern(snap_id), id=np_id)
+            elif led_mode == LEDMode.LOOPER:
+                self.np.set_pattern(pattern=self.looper.pattern(), id=np_id)
 
         # Refresh Display -- encoder value overrides preset/snap while active
         if self.value and self.value.is_active():

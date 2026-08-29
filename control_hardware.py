@@ -23,11 +23,19 @@ class ControlAction:
 
 
 class LEDMode:
-    """Behaviour descriptor of the LED string associated with a Control Button"""
+    """Behaviour descriptor for one entry in MidiController's led_map.
+
+    Not a property of any control hardware -- purely a NeoPixel-group
+    configuration, set separately from whatever button/encoder produces
+    the underlying state.
+    """
 
     NONE = 0
-    SNAP = 1
-    LOOPER = 2
+    SNAP_1_2 = 1
+    SNAP_3_4 = 2
+    SNAP_5_6 = 3
+    SNAP_7_8 = 4
+    LOOPER = 5
 
 
 class Control:
@@ -39,8 +47,8 @@ class Control:
     """
 
     def id(self) -> int:
-        """Identifier used by MidiController's managers (e.g. SnapManager)
-        to tell hardware instances apart."""
+        """Identifier used by MidiController's managers and led_map to
+        tell hardware instances apart."""
         raise NotImplementedError
 
     def update(self) -> ControlAction:
@@ -53,48 +61,10 @@ class ControlButton(Control):
     """Thin event-to-action mapper.
 
     Wraps a debounced Button and knows which ControlAction to report for
-    a press/short-press/long-press, and which LEDMode group it belongs to.
-    """
-
-    def __init__(
-        self,
-        id: int,
-        pin: int,
-        action_pressed: ControlAction = ControlAction.NONE,
-        action_short: ControlAction = ControlAction.NONE,
-        action_long: ControlAction = ControlAction.NONE,
-        led_mode: LEDMode = LEDMode.NONE,
-        debounce_ms: int = 10,
-        long_press_ms: int = 600,
-    ):
-        self._id = id
-        self._button = Button(pin, debounce_ms=debounce_ms, long_press_ms=long_press_ms)
-        self.action_pressed = action_pressed
-        self.action_short = action_short
-        self.action_long = action_long
-        self.led_mode = led_mode
-
-    def id(self) -> int:
-        return self._id
-
-    def update(self) -> ControlAction:
-        event = self._button.consume()
-
-        if event == ButtonEvent.PRESSED:
-            return self.action_pressed
-        elif event == ButtonEvent.SHORT_PRESS:
-            return self.action_short
-        elif event == ButtonEvent.LONG_PRESS:
-            return self.action_long
-
-        return ControlAction.NONE
-
-
-class MenuButton(Control):
-    """Thin event-to-action mapper, without LED-group tracking.
-
-    Same as ControlButton but for buttons that don't drive a NeoPixel
-    group (e.g. an encoder's built-in switch, standalone menu buttons).
+    a press/short-press/long-press. Used for every physical button --
+    footswitches, standalone menu buttons, an encoder's built-in switch,
+    etc. LED behaviour is configured separately via MidiController's
+    led_map, not here.
     """
 
     def __init__(
@@ -133,10 +103,7 @@ class ControlEncoder(Control):
     """Rotary encoder event-to-action mapper (the encoder counterpart to
     ControlButton).
 
-    Reports action_cw/action_ccw for CW/CCW rotation. Carries no switch
-    or multi-value logic of its own -- pair it with a MenuButton (e.g. on
-    the encoder's built-in switch pin) and a ValueManager to build a
-    multi-target proportional control.
+    Reports action_cw/action_ccw for CW/CCW rotation.
     """
 
     def __init__(
