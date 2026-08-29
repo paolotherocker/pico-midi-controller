@@ -13,6 +13,12 @@ import time
 
 MIDI_INTERVAL_MS = 8
 
+# Single source of truth for preset display: blank + every letter A-Z.
+# preset_num is capped at len(_PATCH_MAP) - 1 so a preset value can never
+# index past the end of this list.
+_PATCH_MAP = [" "] + [chr(ord("A") + i) for i in range(26)]
+MAX_PRESET_NUM = len(_PATCH_MAP) - 1
+
 
 def _clamp_byte(value: int) -> int:
     """Clamp to the valid 7-bit MIDI data byte range (0-127)."""
@@ -179,8 +185,8 @@ class PresetManager:
 
     def __init__(self, midi_map: MidiMap, preset_num: int = 8, initial: int = 1):
         self.midi_map = midi_map
-        self.preset_num = preset_num
-        self._value = initial
+        self.preset_num = max(1, min(MAX_PRESET_NUM, preset_num))
+        self._value = max(1, min(self.preset_num, initial))
         self._msg_value = midi_map.PRESET_UP_VAL
 
     def exec_action(self, control_action: ControlAction):
@@ -377,8 +383,6 @@ class MidiController:
     """Manages the control buttons, LEDs, display and rotary encoder to
     generate MIDI messages"""
 
-    _PATCH_MAP = [" ", "A", "B", "C", "D", "E", "F", "G", "H"]
-
     # Converts an led_map entry into the SnapManager id it corresponds to,
     # so led_map can list SNAP_1_2/SNAP_3_4/etc in any order regardless of
     # which control_buttons id actually drives each group.
@@ -414,7 +418,8 @@ class MidiController:
             np (NeoPixelManager): Neo pixel array manager
             display (TM1637): TM1637 display manager
             midi_map (MidiMap): Midi map with pre-set values
-            preset_num (int, optional): Maximum number of presets. Defaults to 8.
+            preset_num (int, optional): Maximum number of presets. Clamped to
+                [1, MAX_PRESET_NUM] (26 -- one per letter A-Z). Defaults to 8.
             pattern_map (PatternMap, optional): LED patterns for every mode
                 (SNAP, LOOPER). Defaults to all off.
             send_mode_msg (bool): Send a snap mode msg to switch to snap mode every
@@ -522,9 +527,7 @@ class MidiController:
         if self.value and self.value.is_active():
             self.display.show(self.value.display_str())
         else:
-            self.display.show(
-                f" {self._PATCH_MAP[self.preset.value()]} {self.snap.value()}"
-            )
+            self.display.show(f" {_PATCH_MAP[self.preset.value()]} {self.snap.value()}")
 
         self.np.poll()
 
