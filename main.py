@@ -77,8 +77,6 @@ SEND_MODE_MSG = True
 # Send a snap message every time a preset message is sent
 REMEMBER_SNAP = True
 
-# Rotary encoder assignable targets, cycled by VALUE_TOGGLE (the encoder's
-# switch, below). Edit freely to change what the encoder controls.
 VALUE_PARAMS = [
     ValueParam(label="V", cc=7, min_value=0, max_value=100, initial=64),  # Volume
     ValueParam(label="A", cc=12, min_value=0, max_value=100, initial=0),  # Param A

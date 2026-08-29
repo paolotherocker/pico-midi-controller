@@ -31,11 +31,7 @@ class LEDMode:
 
 
 class ControlButton(Button):
-    """Thin event-to-action mapper.
-
-    Just a debounced button that knows which ControlAction to report for
-    a press/short-press/long-press, and which LEDMode group it belongs to.
-    """
+    """Thin event-to-action mapper for control buttons"""
 
     def __init__(
         self,
@@ -69,11 +65,7 @@ class ControlButton(Button):
 
 
 class MenuButton(Button):
-    """Thin event-to-action mapper, without LED-group tracking.
-
-    Same as ControlButton but for buttons that don't drive a NeoPixel
-    group (e.g. an encoder's built-in switch, standalone menu buttons).
-    """
+    """Thin event-to-action mapper for buttons without LEDs"""
 
     def __init__(
         self,
@@ -106,13 +98,7 @@ class MenuButton(Button):
 
 class ControlEncoder:
     """Rotary encoder event-to-action mapper (the encoder counterpart to
-    ControlButton).
-
-    Reports action_cw/action_ccw for CW/CCW rotation. Carries no switch
-    or multi-value logic of its own -- pair it with a MenuButton (e.g. on
-    the encoder's built-in switch pin) and a ValueManager to build a
-    multi-target proportional control.
-    """
+    ControlButton)."""
 
     def __init__(
         self,
