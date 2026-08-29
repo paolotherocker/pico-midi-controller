@@ -1,12 +1,6 @@
 from utils.neopixelmanager import NeoPixelManager, Pattern, Off
 from utils.midi import Message, ControlChange
-from control_hardware import (
-    ControlButton,
-    ControlEncoder,
-    MenuButton,
-    ControlAction,
-    LEDMode,
-)
+from control_hardware import Control, ControlButton, ControlEncoder, MenuButton, ControlAction, LEDMode
 from tm1637 import TM1637
 from collections import deque
 import time
@@ -316,9 +310,7 @@ class ValueManager:
     happened recently, for the caller to decide what the display shows.
     """
 
-    def __init__(
-        self, midi_map: MidiMap, params: list[ValueParam], hang_ms: int = 1000
-    ):
+    def __init__(self, midi_map: MidiMap, params: list[ValueParam], hang_ms: int = 1000):
         if not params:
             raise ValueError("ValueManager needs at least one ValueParam")
         self.midi_map = midi_map
@@ -334,21 +326,15 @@ class ValueManager:
             self._index = (self._index + 1) % len(self.params)
         else:
             param = self.params[self._index]
-            delta = (
-                param.step if control_action == ControlAction.VALUE_UP else -param.step
-            )
-            param.value = max(
-                param.min_value, min(param.max_value, param.value + delta)
-            )
+            delta = param.step if control_action == ControlAction.VALUE_UP else -param.step
+            param.value = max(param.min_value, min(param.max_value, param.value + delta))
 
         self._last_change_ms = time.ticks_ms()
 
     def msg(self) -> ControlChange:
         param = self.params[self._index]
         return ControlChange(
-            channel=(
-                param.channel if param.channel is not None else self.midi_map.CHANNEL
-            ),
+            channel=param.channel if param.channel is not None else self.midi_map.CHANNEL,
             controller=param.cc,
             value=param.value,
         )
@@ -385,7 +371,7 @@ class MidiController:
         send_mode_msg: bool = False,
         remember_snap: bool = False,
         control_encoder: ControlEncoder = None,
-        menu_button: MenuButton = None,
+        menu_buttons: list[MenuButton] = None,
         value_params: list[ValueParam] = None,
         value_hang_ms: int = 1000,
     ):
@@ -405,11 +391,12 @@ class MidiController:
                 sent, to make sure the device switches to the same snap number
             control_encoder (ControlEncoder, optional): Rotary encoder reporting
                 VALUE_UP/VALUE_DOWN. Defaults to None.
-            menu_button (MenuButton, optional): Button reporting VALUE_TOGGLE
-                (e.g. wired to the encoder's switch). Defaults to None.
+            menu_buttons (list[MenuButton], optional): Buttons with no LED group,
+                e.g. the encoder's switch (VALUE_TOGGLE) plus any standalone menu
+                buttons. Defaults to None.
             value_params (list[ValueParam], optional): Assignable CC targets,
-                cycled by VALUE_TOGGLE. Required if control_encoder or
-                menu_button is set.
+                cycled by VALUE_TOGGLE. Required if control_encoder or any
+                menu_button reports VALUE_UP/VALUE_DOWN/VALUE_TOGGLE.
             value_hang_ms (int, optional): How long the value display stays up
                 after the last change. Defaults to 1000.
         """
@@ -421,7 +408,7 @@ class MidiController:
         self.send_mode_msg = send_mode_msg
         self.remember_snap = remember_snap
         self.control_encoder = control_encoder
-        self.menu_button = menu_button
+        self.menu_buttons = menu_buttons or []
 
         self.value = (
             ValueManager(midi_map=midi_map, params=value_params, hang_ms=value_hang_ms)
@@ -434,6 +421,12 @@ class MidiController:
         self.preset = PresetManager(midi_map=midi_map, preset_num=preset_num)
         self.looper = LooperManager(midi_map=midi_map, pattern_map=pattern_map)
 
+        # Every piece of control hardware (all Control subclasses), polled
+        # uniformly in update()
+        self._hardware: list[Control] = list(control_buttons) + self.menu_buttons
+        if control_encoder is not None:
+            self._hardware.append(control_encoder)
+
         # MIDI message queue
         self.msg_queue = deque((), 25)
         self.msg_time: int = 0
@@ -441,62 +434,56 @@ class MidiController:
         self.display.brightness(3)
         self.display.show("")
 
-    def _handle_value_action(self, action: ControlAction):
-        if self.value and action in self._VALUE_ACTIONS:
-            self.value.exec_action(action)
-            self.msg_queue.append(self.value.msg())
+    def _handle_action(self, id: int, action: ControlAction):
+        """Single dispatch point for every ControlAction, regardless of
+        which control hardware produced it."""
+        if action == ControlAction.NONE:
+            return
 
-    def update(self):
-        for idx, ctrl in enumerate(self.control_buttons):
-            action = ctrl.update()
+        if action in (
+            ControlAction.SNAP_1_2,
+            ControlAction.SNAP_3_4,
+            ControlAction.SNAP_5_6,
+            ControlAction.SNAP_7_8,
+        ):
+            self.snap.exec_action(id, action)
+            if self.send_mode_msg == True:
+                self.msg_queue.append(self.snap.snap_mode_msg())
+            self.msg_queue.append(self.snap.msg())
 
-            if action == ControlAction.NONE:
-                continue
-
-            if action in (
-                ControlAction.SNAP_1_2,
-                ControlAction.SNAP_3_4,
-                ControlAction.SNAP_5_6,
-                ControlAction.SNAP_7_8,
-            ):
-                self.snap.exec_action(idx, action)
-                if self.send_mode_msg == True:
-                    self.msg_queue.append(self.snap.snap_mode_msg())
+        elif action in (ControlAction.PRESET_UP, ControlAction.PRESET_DOWN):
+            self.preset.exec_action(action)
+            self.msg_queue.append(self.preset.msg())
+            if self.remember_snap == True:
                 self.msg_queue.append(self.snap.msg())
 
-            elif action in (ControlAction.PRESET_UP, ControlAction.PRESET_DOWN):
-                self.preset.exec_action(action)
-                self.msg_queue.append(self.preset.msg())
-                if self.remember_snap == True:
-                    self.msg_queue.append(self.snap.msg())
+        elif action == ControlAction.HOLD:
+            self.np.set_pattern(pattern=self.pattern_map.HOLD, id=id)
 
-            elif action == ControlAction.HOLD:
-                self.np.set_pattern(pattern=self.pattern_map.HOLD, id=idx)
+        elif action in (
+            ControlAction.LOOPER_REC_OD,
+            ControlAction.LOOPER_STOP_PLAY,
+            ControlAction.LOOPER_UNDO,
+            ControlAction.LOOPER_CLEAR,
+        ):
+            self.looper.exec_action(action)
+            self.msg_queue.append(self.looper.msg())
 
-            elif action in (
-                ControlAction.LOOPER_REC_OD,
-                ControlAction.LOOPER_STOP_PLAY,
-                ControlAction.LOOPER_UNDO,
-                ControlAction.LOOPER_CLEAR,
-            ):
-                self.looper.exec_action(action)
-                self.msg_queue.append(self.looper.msg())
+        elif action in self._VALUE_ACTIONS:
+            if self.value:
+                self.value.exec_action(action)
+                self.msg_queue.append(self.value.msg())
 
-            else:
-                self._handle_value_action(action)
-
-        # Rotary encoder (VALUE_UP/VALUE_DOWN) and menu button (VALUE_TOGGLE)
-        if self.control_encoder:
-            self._handle_value_action(self.control_encoder.update())
-        if self.menu_button:
-            self._handle_value_action(self.menu_button.update())
+    def update(self):
+        for ctrl in self._hardware:
+            self._handle_action(ctrl.id(), ctrl.update())
 
         # Refresh NP
-        for idx, ctrl in enumerate(self.control_buttons):
+        for ctrl in self.control_buttons:
             if ctrl.led_mode == LEDMode.SNAP:
-                self.np.set_pattern(pattern=self.snap.pattern(idx), id=idx)
+                self.np.set_pattern(pattern=self.snap.pattern(ctrl.id()), id=ctrl.id())
             if ctrl.led_mode == LEDMode.LOOPER:
-                self.np.set_pattern(pattern=self.looper.pattern(), id=idx)
+                self.np.set_pattern(pattern=self.looper.pattern(), id=ctrl.id())
 
         # Refresh Display -- encoder value overrides preset/snap while active
         if self.value and self.value.is_active():

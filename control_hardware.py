@@ -30,8 +30,31 @@ class LEDMode:
     LOOPER = 2
 
 
-class ControlButton(Button):
-    """Thin event-to-action mapper for control buttons"""
+class Control:
+    """Base class for all control hardware (buttons, encoders, etc.).
+
+    Every subclass owns/builds its own hardware object(s) internally
+    (composition, not inheritance) and must implement id() and update()
+    so MidiController can poll any mix of hardware uniformly.
+    """
+
+    def id(self) -> int:
+        """Identifier used by MidiController's managers (e.g. SnapManager)
+        to tell hardware instances apart."""
+        raise NotImplementedError
+
+    def update(self) -> ControlAction:
+        """Poll the underlying hardware and return the resulting
+        ControlAction, or ControlAction.NONE if nothing happened."""
+        raise NotImplementedError
+
+
+class ControlButton(Control):
+    """Thin event-to-action mapper.
+
+    Wraps a debounced Button and knows which ControlAction to report for
+    a press/short-press/long-press, and which LEDMode group it belongs to.
+    """
 
     def __init__(
         self,
@@ -44,15 +67,18 @@ class ControlButton(Button):
         debounce_ms: int = 10,
         long_press_ms: int = 600,
     ):
-        super().__init__(pin, debounce_ms=debounce_ms, long_press_ms=long_press_ms)
-        self.id = id
+        self._id = id
+        self._button = Button(pin, debounce_ms=debounce_ms, long_press_ms=long_press_ms)
         self.action_pressed = action_pressed
         self.action_short = action_short
         self.action_long = action_long
         self.led_mode = led_mode
 
+    def id(self) -> int:
+        return self._id
+
     def update(self) -> ControlAction:
-        event = self.consume()
+        event = self._button.consume()
 
         if event == ButtonEvent.PRESSED:
             return self.action_pressed
@@ -64,8 +90,12 @@ class ControlButton(Button):
         return ControlAction.NONE
 
 
-class MenuButton(Button):
-    """Thin event-to-action mapper for buttons without LEDs"""
+class MenuButton(Control):
+    """Thin event-to-action mapper, without LED-group tracking.
+
+    Same as ControlButton but for buttons that don't drive a NeoPixel
+    group (e.g. an encoder's built-in switch, standalone menu buttons).
+    """
 
     def __init__(
         self,
@@ -77,14 +107,17 @@ class MenuButton(Button):
         debounce_ms: int = 10,
         long_press_ms: int = 600,
     ):
-        super().__init__(pin, debounce_ms=debounce_ms, long_press_ms=long_press_ms)
-        self.id = id
+        self._id = id
+        self._button = Button(pin, debounce_ms=debounce_ms, long_press_ms=long_press_ms)
         self.action_pressed = action_pressed
         self.action_short = action_short
         self.action_long = action_long
 
+    def id(self) -> int:
+        return self._id
+
     def update(self) -> ControlAction:
-        event = self.consume()
+        event = self._button.consume()
 
         if event == ButtonEvent.PRESSED:
             return self.action_pressed
@@ -96,9 +129,15 @@ class MenuButton(Button):
         return ControlAction.NONE
 
 
-class ControlEncoder:
+class ControlEncoder(Control):
     """Rotary encoder event-to-action mapper (the encoder counterpart to
-    ControlButton)."""
+    ControlButton).
+
+    Reports action_cw/action_ccw for CW/CCW rotation. Carries no switch
+    or multi-value logic of its own -- pair it with a MenuButton (e.g. on
+    the encoder's built-in switch pin) and a ValueManager to build a
+    multi-target proportional control.
+    """
 
     def __init__(
         self,
@@ -121,13 +160,16 @@ class ControlEncoder:
                 Defaults to ControlAction.VALUE_DOWN.
             debounce_ms (int, optional): Rotary debounce. Defaults to 2.
         """
-        self.id = id
-        self.encoder = KY040(dt_pin=dt_pin, clk_pin=clk_pin, debounce_ms=debounce_ms)
+        self._id = id
+        self._encoder = KY040(dt_pin=dt_pin, clk_pin=clk_pin, debounce_ms=debounce_ms)
         self.action_cw = action_cw
         self.action_ccw = action_ccw
 
+    def id(self) -> int:
+        return self._id
+
     def update(self) -> ControlAction:
-        event = self.encoder.consume()
+        event = self._encoder.consume()
 
         if event == RotaryEvent.CW:
             return self.action_cw
