@@ -1,0 +1,9 @@
+[submodule "lib/micropython-tm1637"]
+	path = lib/micropython-tm1637
+	url = https://github.com/mcauser/micropython-tm1637.git
+[submodule "lib/micropython-lib"]
+	path = lib/micropython-lib
+	url = https://github.com/micropython/micropython-lib.git
+[submodule "lib/micropython-utils"]
+	path = lib/micropython-utils
+	url = https://github.com/paolotherocker/micropython-utils.git
