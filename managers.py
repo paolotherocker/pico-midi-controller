@@ -138,15 +138,24 @@ class SnapManager:
     def __init__(self, midi_map: MidiMap, pattern_map: PatternMap):
         self.midi_map = midi_map
         self.pattern_map = pattern_map
-        self.active_action = None
-        self._secondary = {}
-        self._value = 0
 
         self._snap_mode_msg = ControlChange(
             channel=midi_map.CHANNEL,
             controller=midi_map.SNAP_CC,
             value=midi_map.SNAP_MODE_VAL,
         )
+
+        # Starts on SNAP 1/2 active, no secondary values set.
+        self.reset()
+
+    def reset(self):
+        """Clears every group's secondary value and reactivates SNAP 1/2,
+        the default group. Called on start-up and whenever a preset
+        command is received, since a preset shouldn't inherit whatever
+        SNAP state was active on the previous preset."""
+        self._secondary = {}
+        self.active_action = ControlAction.SNAP_1_2
+        self._value = self._BASE_VALUE[ControlAction.SNAP_1_2]
 
     def exec_action(self, control_action: ControlAction):
         """Updates state for a SNAP press. Retrieve the resulting message

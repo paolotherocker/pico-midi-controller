@@ -133,7 +133,7 @@ class MidiController:
         self.msg_time: int = 0
 
         self.display.brightness(3)
-        self.display.show("")
+        self.display.show("    ")
 
     def _configured_actions(
         self, control_buttons: list[ControlButton], control_encoder: ControlEncoder
@@ -198,6 +198,8 @@ class MidiController:
         elif action in (ControlAction.PRESET_UP, ControlAction.PRESET_DOWN):
             self.preset.exec_action(action)
             self.msg_queue.append(self.preset.msg())
+            self.snap.reset()
+            self.msg_queue.append(self.snap.msg())
 
         elif action in self._LOOPER_ACTIONS:
             self.looper.exec_action(action)
@@ -237,7 +239,7 @@ class MidiController:
         if self.value and self.value.is_active():
             self.display.show(self.value.display_str())
         else:
-            self.display.show(f" {_PATCH_MAP[self.preset.value()]} {self.snap.value()}")
+            self.display.show(f"   {_PATCH_MAP[self.preset.value()]}")
 
         self.np.poll()
 

@@ -51,10 +51,10 @@ MIDI_MAP = MidiMap(
 )
 
 PATTERN_MAP = PatternMap(
-    snap_active=Wave((5, 0, 5), (80, 0, 80), period_ms=3000),
-    snap_active_sec=Wave((0, 0, 10), (0, 0, 160), period_ms=3000),
-    snap_passive=Solid((2, 0, 2)),
-    snap_passive_sec=Solid((0, 0, 4)),
+    snap_active=Wave((4, 0, 4), (40, 0, 40), period_ms=3000),
+    snap_active_sec=Wave((0, 0, 8), (0, 0, 80), period_ms=3000),
+    snap_passive=Solid((1, 0, 1)),
+    snap_passive_sec=Solid((0, 0, 2)),
     looper_empty=Solid((0, 80, 0)),  # Green
     looper_stopped=Solid((0, 40, 40)),  # Yellow
     looper_playing=Solid((0, 40, 40)),  # Yellow
@@ -82,7 +82,9 @@ SEND_MODE_MSG = True
 
 # Rotary encoder value targets
 VALUE_PARAMS = [
-    ValueParam(label="V", cc=7, min_value=0, max_value=127, initial=69),  # Volume
+    ValueParam(
+        label="V", cc=7, min_value=0, max_value=127, initial=100, step=2
+    ),  # Volume
     ValueParam(label="A", cc=12, min_value=0, max_value=127, initial=0),  # Param A
     ValueParam(label="B", cc=13, min_value=0, max_value=127, initial=0),  # Param B
 ]
