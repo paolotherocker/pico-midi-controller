@@ -6,9 +6,10 @@ mpremote fs cp -r lib_common :/lib
 """
 
 from machine import Pin
-from utils.neopixelmanager import NeoPixelManager, Pulse, Solid, Off
+from utils.neopixelmanager import NeoPixelManager, Pulse, Solid, Off, Wave
 import time
 from tm1637 import TM1637
+from utils.midi import MidiUsb
 from midi_controller import MidiController, MidiMap, PatternMap, ValueParam
 from control_hardware import ControlButton, ControlEncoder, ControlAction, LEDMode
 
@@ -31,6 +32,9 @@ P_ROTARY_SW = 4
 # Extra button pins
 P_MENU_BUTTONS = [10, 11]
 
+# USB MIDI device name shown on the host
+MIDI_PRODUCT_STR = "Pico Midi Controller"
+
 MIDI_MAP = MidiMap(
     channel=0,
     snap_cc=24,
@@ -46,15 +50,15 @@ MIDI_MAP = MidiMap(
 )
 
 PATTERN_MAP = PatternMap(
-    snap_active=Pulse((0, 200, 0), (0, 180, 20), period_ms=5000),
-    snap_active_sec=Pulse((0, 0, 200), (0, 20, 180), period_ms=5000),
-    snap_passive=Solid((0, 80, 0)),
-    snap_passive_sec=Solid((0, 0, 80)),
-    looper_empty=Solid((0, 100, 0)),  # Green
-    looper_stopped=Solid((100, 100, 0)),  # Yellow
-    looper_playing=Solid((200, 200, 0)),  # Yellow
-    looper_recording=Solid((200, 0, 0)),  # Red
-    looper_overdubbing=Solid((200, 0, 0)),  # Red
+    snap_active=Wave((5, 0, 5), (80, 0, 80), period_ms=3000),
+    snap_active_sec=Wave((0, 0, 10), (0, 0, 160), period_ms=3000),
+    snap_passive=Solid((2, 0, 2)),
+    snap_passive_sec=Solid((0, 0, 4)),
+    looper_empty=Solid((0, 80, 0)),  # Green
+    looper_stopped=Solid((0, 40, 40)),  # Yellow
+    looper_playing=Solid((0, 40, 40)),  # Yellow
+    looper_recording=Solid((80, 0, 0)),  # Red
+    looper_overdubbing=Solid((80, 0, 0)),  # Red
 )
 
 CONTROLS_MAP = [
@@ -79,10 +83,11 @@ REMEMBER_SNAP = True
 
 # Rotary encoder value targets
 VALUE_PARAMS = [
-    ValueParam(label="V", cc=7, min_value=0, max_value=100, initial=100),  # Volume
+    ValueParam(label="V", cc=7, min_value=0, max_value=127, initial=69),  # Volume
     ValueParam(label="A", cc=12, min_value=0, max_value=127, initial=0),  # Param A
     ValueParam(label="B", cc=13, min_value=0, max_value=127, initial=0),  # Param B
 ]
+
 # How long (ms) the value stays on screen after the last change
 VALUE_HANG_MS = 1000
 
@@ -115,11 +120,14 @@ np_array = NeoPixelManager(pin_id=P_NP, n=NP_STRIP_LEN * NP_STRIP_NUM)
 for i in range(NP_STRIP_NUM):
     np_array.add_subset(NP_STRIP_LEN)
 
+midi = MidiUsb(product_str=MIDI_PRODUCT_STR)
+
 midi_controller = MidiController(
     control_buttons=controls,
     np=np_array,
     display=display,
     midi_map=MIDI_MAP,
+    midi=midi,
     pattern_map=PATTERN_MAP,
     send_mode_msg=SEND_MODE_MSG,
     remember_snap=REMEMBER_SNAP,

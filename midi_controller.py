@@ -1,14 +1,20 @@
 """Top-level MidiController: polls control hardware, drives the SNAP,
-preset, looper, and value managers, and refreshes the NeoPixel array
-and display accordingly.
+preset, looper, and value managers, sends the resulting MIDI messages
+over USB, and refreshes the NeoPixel array and display accordingly.
 """
 
 import time
 from collections import deque
 from tm1637 import TM1637
 from utils.neopixelmanager import NeoPixelManager, Off
-from utils.midi import Message
-from control_hardware import Control, ControlButton, ControlEncoder, ControlAction, LEDMode
+from utils.midi import Message, MidiUsb
+from control_hardware import (
+    Control,
+    ControlButton,
+    ControlEncoder,
+    ControlAction,
+    LEDMode,
+)
 from managers import (
     ConfigError,
     MidiMap,
@@ -25,8 +31,8 @@ MIDI_INTERVAL_MS = 8
 
 
 class MidiController:
-    """Generates MIDI messages from control hardware, and refreshes the
-    LEDs and display."""
+    """Generates MIDI messages from control hardware, sends them over
+    USB, and refreshes the LEDs and display."""
 
     _MSG_QUEUE_MAXLEN = 256
 
@@ -56,6 +62,7 @@ class MidiController:
         np: NeoPixelManager,
         display: TM1637,
         midi_map: MidiMap,
+        midi: MidiUsb,
         preset_num: int = 8,
         pattern_map: PatternMap = PatternMap(),
         send_mode_msg: bool = False,
@@ -71,6 +78,7 @@ class MidiController:
             np (NeoPixelManager): NeoPixel array manager.
             display (TM1637): Display manager.
             midi_map (MidiMap): MIDI channel and CC configuration.
+            midi (MidiUsb): USB MIDI output used to send queued messages.
             preset_num (int, optional): Number of presets. Defaults to 8.
             pattern_map (PatternMap, optional): LED patterns to use.
                 Defaults to all off.
@@ -95,10 +103,17 @@ class MidiController:
         """
         self.np = np
         self.display = display
+        self.midi = midi
         self.pattern_map = pattern_map
         self.send_mode_msg = send_mode_msg
         self.remember_snap = remember_snap
         self.led_map = led_map or []
+
+        # Tracks the Pattern instance last applied to each NeoPixel group,
+        # so set_pattern() is only called on an actual change. Calling it
+        # every update() would reset each pattern's internal start time
+        # and freeze animated patterns (Pulse, Flash, Wave) at t=0.
+        self._led_pattern: list = [None] * len(self.led_map)
 
         self.value = (
             ValueManager(midi_map=midi_map, params=value_params, hang_ms=value_hang_ms)
@@ -202,16 +217,27 @@ class MidiController:
         if len(self.msg_queue) >= self._MSG_QUEUE_MAXLEN:
             self._fail(ConfigError.QUEUE_OVERFLOW)
 
+    def _refresh_leds(self):
+        """Applies each NeoPixel group's current pattern, but only calls
+        set_pattern() when the pattern actually changed. Re-applying an
+        unchanged pattern every frame would reset its start time and
+        freeze animated patterns (Pulse, Flash, Wave)."""
+        for np_id, led_mode in enumerate(self.led_map):
+            pattern = None
+            if led_mode in SnapManager._ACTION_BY_LED_MODE:
+                pattern = self.snap.pattern(led_mode)
+            elif led_mode == LEDMode.LOOPER:
+                pattern = self.looper.pattern()
+
+            if pattern is not None and pattern is not self._led_pattern[np_id]:
+                self.np.set_pattern(pattern=pattern, id=np_id)
+                self._led_pattern[np_id] = pattern
+
     def update(self):
         for ctrl in self._hardware:
             self._handle_action(ctrl.update())
 
-        # Refresh NP
-        for np_id, led_mode in enumerate(self.led_map):
-            if led_mode in SnapManager._ACTION_BY_LED_MODE:
-                self.np.set_pattern(pattern=self.snap.pattern(led_mode), id=np_id)
-            elif led_mode == LEDMode.LOOPER:
-                self.np.set_pattern(pattern=self.looper.pattern(), id=np_id)
+        self._refresh_leds()
 
         # Refresh Display
         if self.value and self.value.is_active():
@@ -226,4 +252,5 @@ class MidiController:
             if len(self.msg_queue) > 0:
                 self.msg_time = now
                 msg: Message = self.msg_queue.popleft()
-                print(*msg.to_bytes())
+                if self.midi.is_open():
+                    self.midi.send_message(msg)
