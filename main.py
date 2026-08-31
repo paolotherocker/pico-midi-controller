@@ -27,7 +27,7 @@ P_CONTROLS = [6, 7, 8, 9]
 # Encoder pins
 P_ROTARY_CLK = 2
 P_ROTARY_DT = 3
-P_ROTARY_SW = 13
+P_ROTARY_SW = 4
 # Extra button pins
 P_MENU_BUTTONS = [10, 11]
 
