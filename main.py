@@ -25,8 +25,8 @@ NP_STRIP_NUM = 4  # Number of strips
 # Control pins
 P_CONTROLS = [6, 7, 8, 9]
 # Encoder pins
-P_ROTARY_CLK = 14
-P_ROTARY_DT = 15
+P_ROTARY_CLK = 2
+P_ROTARY_DT = 3
 P_ROTARY_SW = 13
 # Extra button pins
 P_MENU_BUTTONS = [10, 11]
