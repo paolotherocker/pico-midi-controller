@@ -66,7 +66,6 @@ class MidiController:
         preset_num: int = 8,
         pattern_map: PatternMap = PatternMap(),
         send_mode_msg: bool = False,
-        remember_snap: bool = False,
         led_map: list[LEDMode] = None,
         control_encoder: ControlEncoder = None,
         value_params: list[ValueParam] = None,
@@ -84,8 +83,6 @@ class MidiController:
                 Defaults to all off.
             send_mode_msg (bool, optional): Send a mode message before each
                 snap message. Defaults to False.
-            remember_snap (bool, optional): Send a snap message after each
-                preset message. Defaults to False.
             led_map (list[LEDMode], optional): LED mode for each NeoPixel
                 group, in order. Defaults to None.
             control_encoder (ControlEncoder, optional): Encoder to poll.
@@ -106,7 +103,6 @@ class MidiController:
         self.midi = midi
         self.pattern_map = pattern_map
         self.send_mode_msg = send_mode_msg
-        self.remember_snap = remember_snap
         self.led_map = led_map or []
 
         # Tracks the Pattern instance last applied to each NeoPixel group,
@@ -202,8 +198,6 @@ class MidiController:
         elif action in (ControlAction.PRESET_UP, ControlAction.PRESET_DOWN):
             self.preset.exec_action(action)
             self.msg_queue.append(self.preset.msg())
-            if self.remember_snap == True:
-                self.msg_queue.append(self.snap.msg())
 
         elif action in self._LOOPER_ACTIONS:
             self.looper.exec_action(action)

@@ -44,6 +44,7 @@ class MidiMap:
     PRESET_CC: int
     PRESET_UP_VAL: int
     PRESET_DOWN_VAL: int
+    PRESET_MODE_VAL: int
     LOOPER_CC: int
     LOOPER_RO_VAL: int
     LOOPER_SP_VAL: int
@@ -58,6 +59,7 @@ class MidiMap:
         preset_cc: int,
         preset_up_val: int,
         preset_down_val: int,
+        preset_mode_val: int,
         looper_cc: int,
         looper_ro_val: int,
         looper_sp_val: int,
@@ -70,6 +72,7 @@ class MidiMap:
         self.PRESET_CC = _clamp_byte(preset_cc)
         self.PRESET_UP_VAL = _clamp_byte(preset_up_val)
         self.PRESET_DOWN_VAL = _clamp_byte(preset_down_val)
+        self.PRESET_MODE_VAL = _clamp_byte(preset_mode_val)
         self.LOOPER_CC = _clamp_byte(looper_cc)
         self.LOOPER_RO_VAL = _clamp_byte(looper_ro_val)
         self.LOOPER_SP_VAL = _clamp_byte(looper_sp_val)
@@ -195,6 +198,15 @@ class PresetManager:
         self.preset_num = max(1, min(MAX_PRESET_NUM, preset_num))
         self._value = max(1, min(self.preset_num, initial))
         self._msg_value = midi_map.PRESET_UP_VAL
+
+        self._preset_mode_msg = ControlChange(
+            channel=midi_map.CHANNEL,
+            controller=midi_map.PRESET_CC,
+            value=midi_map.PRESET_MODE_VAL,
+        )
+
+    def preset_mode_msg(self):
+        return self._preset_mode_msg
 
     def exec_action(self, control_action: ControlAction):
         """Updates the preset number. Retrieve the resulting message via
@@ -325,7 +337,9 @@ class ValueManager:
     """Tracks a list of value targets and which one is currently
     selected."""
 
-    def __init__(self, midi_map: MidiMap, params: list[ValueParam], hang_ms: int = 1000):
+    def __init__(
+        self, midi_map: MidiMap, params: list[ValueParam], hang_ms: int = 1000
+    ):
         """
         Args:
             midi_map (MidiMap): MIDI channel configuration.
@@ -348,15 +362,21 @@ class ValueManager:
             self._index = (self._index + 1) % len(self.params)
         else:
             param = self.params[self._index]
-            delta = param.step if control_action == ControlAction.VALUE_UP else -param.step
-            param.value = max(param.min_value, min(param.max_value, param.value + delta))
+            delta = (
+                param.step if control_action == ControlAction.VALUE_UP else -param.step
+            )
+            param.value = max(
+                param.min_value, min(param.max_value, param.value + delta)
+            )
 
         self._last_change_ms = time.ticks_ms()
 
     def msg(self) -> ControlChange:
         param = self.params[self._index]
         return ControlChange(
-            channel=param.channel if param.channel is not None else self.midi_map.CHANNEL,
+            channel=(
+                param.channel if param.channel is not None else self.midi_map.CHANNEL
+            ),
             controller=param.cc,
             value=param.value,
         )

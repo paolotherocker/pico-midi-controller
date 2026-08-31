@@ -42,6 +42,7 @@ MIDI_MAP = MidiMap(
     preset_cc=20,
     preset_up_val=1,
     preset_down_val=2,
+    preset_mode_val=0,
     looper_cc=25,
     looper_ro_val=1,
     looper_sp_val=2,
@@ -78,8 +79,6 @@ LED_MAP = [
 
 # Send a mode message every time a snap message is sent
 SEND_MODE_MSG = True
-# Send a snap message every time a preset message is sent
-REMEMBER_SNAP = True
 
 # Rotary encoder value targets
 VALUE_PARAMS = [
@@ -130,7 +129,6 @@ midi_controller = MidiController(
     midi=midi,
     pattern_map=PATTERN_MAP,
     send_mode_msg=SEND_MODE_MSG,
-    remember_snap=REMEMBER_SNAP,
     led_map=LED_MAP,
     control_encoder=control_encoder,
     value_params=VALUE_PARAMS,
