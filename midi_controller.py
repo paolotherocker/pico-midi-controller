@@ -24,7 +24,7 @@ from managers import (
     LooperManager,
     ValueParam,
     ValueManager,
-    _PATCH_MAP,
+    PATCH_MAP,
 )
 
 MIDI_INTERVAL_MS = 8
@@ -168,7 +168,7 @@ class MidiController:
         # led_map must fit within the NeoPixel array's actual groups
         try:
             for np_id in range(len(self.led_map)):
-                self.np.set_pattern(pattern=Off(), id=np_id)
+                self.np.set_pattern(pattern=Off(), subset_id=np_id)
         except Exception:
             self._fail(ConfigError.LED_MAP_SIZE)
 
@@ -226,7 +226,7 @@ class MidiController:
                 pattern = self.looper.pattern()
 
             if pattern is not None and pattern is not self._led_pattern[np_id]:
-                self.np.set_pattern(pattern=pattern, id=np_id)
+                self.np.set_pattern(pattern=pattern, subset_id=np_id)
                 self._led_pattern[np_id] = pattern
 
     def update(self):
@@ -239,9 +239,10 @@ class MidiController:
         if self.value and self.value.is_active():
             self.display.show(self.value.display_str())
         else:
-            self.display.show(f"   {_PATCH_MAP[self.preset.value()]}")
+            self.display.show(f"   {PATCH_MAP[self.preset.value()]}")
 
-        self.np.poll()
+        self.np.update()
+        self.np.write()
 
         now = time.ticks_ms()
         if time.ticks_diff(now, self.msg_time) > MIDI_INTERVAL_MS:

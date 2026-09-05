@@ -9,8 +9,8 @@ from utils.neopixelmanager import Pattern, Off
 from utils.midi import ControlChange
 from control_hardware import ControlAction, LEDMode
 
-_PATCH_MAP = [" "] + [chr(ord("A") + i) for i in range(26)]
-MAX_PRESET_NUM = len(_PATCH_MAP) - 1
+PATCH_MAP = [" "] + [chr(ord("A") + i) for i in range(26)]
+MAX_PRESET_NUM = len(PATCH_MAP) - 1
 
 
 def _clamp_byte(value: int) -> int:
