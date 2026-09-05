@@ -24,7 +24,6 @@ from managers import (
     LooperManager,
     ValueParam,
     ValueManager,
-    PATCH_MAP,
 )
 
 MIDI_INTERVAL_MS = 8
@@ -239,7 +238,7 @@ class MidiController:
         if self.value and self.value.is_active():
             self.display.show(self.value.display_str())
         else:
-            self.display.show(f"   {PATCH_MAP[self.preset.value()]}")
+            self.display.show(self.preset.display_str())
 
         self.np.update()
         self.np.write()

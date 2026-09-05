@@ -9,9 +9,6 @@ from utils.neopixelmanager import Pattern, Off
 from utils.midi import ControlChange
 from control_hardware import ControlAction, LEDMode
 
-PATCH_MAP = [" "] + [chr(ord("A") + i) for i in range(26)]
-MAX_PRESET_NUM = len(PATCH_MAP) - 1
-
 
 def _clamp_byte(value: int) -> int:
     """Clamp to the valid 7-bit MIDI data byte range (0-127)."""
@@ -203,7 +200,7 @@ class PresetManager:
 
     def __init__(self, midi_map: MidiMap, preset_num: int = 8, initial: int = 1):
         self.midi_map = midi_map
-        self.preset_num = max(1, min(MAX_PRESET_NUM, preset_num))
+        self.preset_num = max(1, preset_num)
         self._value = max(1, min(self.preset_num, initial))
         self._msg_value = midi_map.PRESET_UP_VAL
 
@@ -240,6 +237,10 @@ class PresetManager:
 
     def value(self) -> int:
         return self._value
+
+    def display_str(self) -> str:
+        """Formatted display string, e.g. "P  1"."""
+        return "P{:3d}".format(self._value)
 
 
 class LooperManager:
@@ -414,4 +415,4 @@ class ValueManager:
     def display_str(self) -> str:
         """Formatted display string, e.g. "V068"."""
         param = self.params[self._index]
-        return "{}{:03d}".format(param.label, param.value)
+        return "{}{:3d}".format(param.label, param.value)
