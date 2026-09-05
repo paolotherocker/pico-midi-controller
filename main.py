@@ -83,7 +83,7 @@ SEND_MODE_MSG = True
 # Rotary encoder value targets
 VALUE_PARAMS = [
     ValueParam(
-        label="V", cc=7, min_value=0, max_value=127, initial=100, step=2
+        label="V", cc=7, min_value=0, max_value=127, initial=100, step=1
     ),  # Volume
     ValueParam(label="A", cc=12, min_value=0, max_value=127, initial=0),  # Param A
     ValueParam(label="B", cc=13, min_value=0, max_value=127, initial=0),  # Param B

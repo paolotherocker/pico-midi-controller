@@ -191,7 +191,6 @@ class SnapManager:
                 if secondary
                 else self.pattern_map.SNAP_ACTIVE
             )
-
         return (
             self.pattern_map.SNAP_PASSIVE_SEC
             if secondary
@@ -346,6 +345,13 @@ class ValueManager:
     """Tracks a list of value targets and which one is currently
     selected."""
 
+    # Encoder acceleration: consecutive steps arriving within these
+    # intervals get a larger multiplier applied to param.step.
+    _ACCEL_FAST_MS = 30
+    _ACCEL_FAST_MULT = 4
+    _ACCEL_MED_MS = 80
+    _ACCEL_MED_MULT = 2
+
     def __init__(
         self, midi_map: MidiMap, params: list[ValueParam], hang_ms: int = 1000
     ):
@@ -363,6 +369,7 @@ class ValueManager:
         self.hang_ms = hang_ms
         self._index = 0
         self._last_change_ms = 0
+        self._last_step_ms = 0
 
     def exec_action(self, control_action: ControlAction):
         """Selects the next target, or adjusts the current target's value.
@@ -371,13 +378,23 @@ class ValueManager:
             self._index = (self._index + 1) % len(self.params)
         else:
             param = self.params[self._index]
-            delta = (
-                param.step if control_action == ControlAction.VALUE_UP else -param.step
-            )
+
+            now = time.ticks_ms()
+            interval = time.ticks_diff(now, self._last_step_ms)
+            self._last_step_ms = now
+            if interval < self._ACCEL_FAST_MS:
+                mult = self._ACCEL_FAST_MULT
+            elif interval < self._ACCEL_MED_MS:
+                mult = self._ACCEL_MED_MULT
+            else:
+                mult = 1
+
+            delta = param.step * mult
+            if control_action == ControlAction.VALUE_DOWN:
+                delta = -delta
             param.value = max(
                 param.min_value, min(param.max_value, param.value + delta)
             )
-
         self._last_change_ms = time.ticks_ms()
 
     def msg(self) -> ControlChange:
