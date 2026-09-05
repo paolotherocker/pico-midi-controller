@@ -51,8 +51,8 @@ MIDI_MAP = MidiMap(
 )
 
 PATTERN_MAP = PatternMap(
-    snap_active=Wave((3, 0, 3), (30, 0, 30), period_ms=3000),
-    snap_active_sec=Wave((0, 0, 6), (0, 0, 60), period_ms=3000),
+    snap_active=Wave((3, 0, 3), (30, 0, 30), period_ms=3000, spread=1),
+    snap_active_sec=Wave((0, 0, 6), (0, 0, 60), period_ms=3000, spread=1),
     snap_passive=Solid((0, 0, 0)),
     snap_passive_sec=Solid((0, 0, 0)),
     looper_empty=Solid((0, 80, 0)),  # Green
