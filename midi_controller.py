@@ -53,6 +53,7 @@ class MidiController:
         ControlAction.VALUE_UP,
         ControlAction.VALUE_DOWN,
         ControlAction.VALUE_TOGGLE,
+        ControlAction.VALUE_DISP,
     )
 
     def __init__(

@@ -85,8 +85,8 @@ VALUE_PARAMS = [
     ValueParam(
         label="V", cc=7, min_value=0, max_value=127, initial=100, step=1
     ),  # Volume
-    ValueParam(label="A", cc=12, min_value=0, max_value=127, initial=0),  # Param A
-    ValueParam(label="B", cc=13, min_value=0, max_value=127, initial=0),  # Param B
+    # ValueParam(label="A", cc=12, min_value=0, max_value=127, initial=0),  # Param A
+    # ValueParam(label="B", cc=13, min_value=0, max_value=127, initial=0),  # Param B
 ]
 
 # How long (ms) the value stays on screen after the last change
@@ -104,7 +104,13 @@ for i in range(4):
     )
 
 # Encoder switch and extra menu buttons
-controls.append(ControlButton(pin=P_ROTARY_SW, action_long=ControlAction.VALUE_TOGGLE))
+controls.append(
+    ControlButton(
+        pin=P_ROTARY_SW,
+        action_pressed=ControlAction.VALUE_DISP,
+        action_long=ControlAction.VALUE_TOGGLE,
+    )
+)
 controls.append(
     ControlButton(pin=P_MENU_BUTTONS[0], action_pressed=ControlAction.PRESET_UP)
 )

@@ -348,7 +348,7 @@ class ValueManager:
 
     # Encoder acceleration: consecutive steps arriving within these
     # intervals get a larger multiplier applied to param.step.
-    _ACCEL_FAST_MS = 30
+    _ACCEL_FAST_MS = 40
     _ACCEL_FAST_MULT = 4
     _ACCEL_MED_MS = 80
     _ACCEL_MED_MULT = 2
@@ -375,9 +375,12 @@ class ValueManager:
     def exec_action(self, control_action: ControlAction):
         """Selects the next target, or adjusts the current target's value.
         Retrieve the resulting message via msg()."""
-        if control_action == ControlAction.VALUE_TOGGLE:
+        if control_action == ControlAction.VALUE_DISP:
+            # do nothing
+            pass
+        elif control_action == ControlAction.VALUE_TOGGLE:
             self._index = (self._index + 1) % len(self.params)
-        else:
+        elif control_action in (ControlAction.VALUE_UP, ControlAction.VALUE_DOWN):
             param = self.params[self._index]
 
             now = time.ticks_ms()
