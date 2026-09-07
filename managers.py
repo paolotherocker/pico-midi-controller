@@ -9,9 +9,6 @@ from utils.neopixelmanager import Pattern, Off
 from utils.midi import ControlChange
 from control_hardware import ControlAction, LEDMode
 
-_PATCH_MAP = [" "] + [chr(ord("A") + i) for i in range(26)]
-MAX_PRESET_NUM = len(_PATCH_MAP) - 1
-
 
 def _clamp_byte(value: int) -> int:
     """Clamp to the valid 7-bit MIDI data byte range (0-127)."""
@@ -191,7 +188,6 @@ class SnapManager:
                 if secondary
                 else self.pattern_map.SNAP_ACTIVE
             )
-
         return (
             self.pattern_map.SNAP_PASSIVE_SEC
             if secondary
@@ -204,7 +200,7 @@ class PresetManager:
 
     def __init__(self, midi_map: MidiMap, preset_num: int = 8, initial: int = 1):
         self.midi_map = midi_map
-        self.preset_num = max(1, min(MAX_PRESET_NUM, preset_num))
+        self.preset_num = max(1, preset_num)
         self._value = max(1, min(self.preset_num, initial))
         self._msg_value = midi_map.PRESET_UP_VAL
 
@@ -241,6 +237,10 @@ class PresetManager:
 
     def value(self) -> int:
         return self._value
+
+    def display_str(self) -> str:
+        """Formatted display string, e.g. "P  1"."""
+        return "P{:3d}".format(self._value)
 
 
 class LooperManager:
@@ -346,6 +346,13 @@ class ValueManager:
     """Tracks a list of value targets and which one is currently
     selected."""
 
+    # Encoder acceleration: consecutive steps arriving within these
+    # intervals get a larger multiplier applied to param.step.
+    _ACCEL_FAST_MS = 30
+    _ACCEL_FAST_MULT = 4
+    _ACCEL_MED_MS = 80
+    _ACCEL_MED_MULT = 2
+
     def __init__(
         self, midi_map: MidiMap, params: list[ValueParam], hang_ms: int = 1000
     ):
@@ -363,6 +370,7 @@ class ValueManager:
         self.hang_ms = hang_ms
         self._index = 0
         self._last_change_ms = 0
+        self._last_step_ms = 0
 
     def exec_action(self, control_action: ControlAction):
         """Selects the next target, or adjusts the current target's value.
@@ -371,13 +379,23 @@ class ValueManager:
             self._index = (self._index + 1) % len(self.params)
         else:
             param = self.params[self._index]
-            delta = (
-                param.step if control_action == ControlAction.VALUE_UP else -param.step
-            )
+
+            now = time.ticks_ms()
+            interval = time.ticks_diff(now, self._last_step_ms)
+            self._last_step_ms = now
+            if interval < self._ACCEL_FAST_MS:
+                mult = self._ACCEL_FAST_MULT
+            elif interval < self._ACCEL_MED_MS:
+                mult = self._ACCEL_MED_MULT
+            else:
+                mult = 1
+
+            delta = param.step * mult
+            if control_action == ControlAction.VALUE_DOWN:
+                delta = -delta
             param.value = max(
                 param.min_value, min(param.max_value, param.value + delta)
             )
-
         self._last_change_ms = time.ticks_ms()
 
     def msg(self) -> ControlChange:
@@ -397,4 +415,4 @@ class ValueManager:
     def display_str(self) -> str:
         """Formatted display string, e.g. "V068"."""
         param = self.params[self._index]
-        return "{}{:03d}".format(param.label, param.value)
+        return "{}{:3d}".format(param.label, param.value)

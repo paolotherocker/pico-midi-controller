@@ -69,9 +69,9 @@ class ControlButton(Control):
     def update(self) -> ControlAction:
         event = self._button.consume()
 
-        if event == ButtonEvent.PRESSED:
+        if event == ButtonEvent.PRESS:
             return self.action_pressed
-        elif event == ButtonEvent.SHORT_PRESS:
+        elif event == ButtonEvent.SHORT_RELEASE:
             return self.action_short
         elif event == ButtonEvent.LONG_PRESS:
             return self.action_long

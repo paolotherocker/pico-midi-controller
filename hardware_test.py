@@ -90,12 +90,12 @@ def send_cc(controller, value):
 # --- Start-up self-test: sweep each NeoPixel group in turn ---
 display.show("Init")
 for sid in strip_ids:
-    np_array.set_pattern(pattern=Solid(COLOUR), id=sid)
-    np_array.poll()
+    np_array.set_pattern(pattern=Solid(COLOUR), subset_id=sid)
+    np_array.update()
     np_array.write()
     time.sleep_ms(150)
-    np_array.set_pattern(pattern=Off(), id=sid)
-    np_array.poll()
+    np_array.set_pattern(pattern=Off(), subset_id=sid)
+    np_array.update()
     np_array.write()
 display.show("Rdy ")
 print("Self-test sweep complete. Waiting for input...")
@@ -113,25 +113,25 @@ def show(text, hold_ms=DISPLAY_HOLD_MS):
 
 
 def flash(strip_id, hold_ms=FLASH_MS):
-    np_array.set_pattern(pattern=Solid(COLOUR), id=strip_id)
+    np_array.set_pattern(pattern=Solid(COLOUR), subset_id=strip_id)
     flash_until[strip_id] = time.ticks_add(time.ticks_ms(), hold_ms)
 
 
 while True:
     for i, btn in enumerate(foot_buttons):
         event = btn.consume()
-        if event == ButtonEvent.PRESSED:
+        if event == ButtonEvent.PRESS:
             flash(strip_ids[i])
             show("SW{}".format(i + 1))
             send_cc(SW_CC[i], 127)
 
     for i, btn in enumerate(menu_buttons):
         event = btn.consume()
-        if event == ButtonEvent.PRESSED:
+        if event == ButtonEvent.PRESS:
             show("MN{}".format(i + 1))
             send_cc(MENU_CC[i], 127)
 
-    if encoder_button.consume() == ButtonEvent.PRESSED:
+    if encoder_button.consume() == ButtonEvent.PRESS:
         show("ENC ")
         send_cc(ENC_SW_CC, 127)
 
@@ -148,12 +148,13 @@ while True:
     now = time.ticks_ms()
     for sid in strip_ids:
         if flash_until[sid] and time.ticks_diff(now, flash_until[sid]) > 0:
-            np_array.set_pattern(pattern=Off(), id=sid)
+            np_array.set_pattern(pattern=Off(), subset_id=sid)
             flash_until[sid] = 0
 
     if display_until and time.ticks_diff(now, display_until) > 0:
         display.show("Rdy ")
         display_until = 0
 
-    np_array.poll()
+    np_array.update()
+    np_array.write()
     time.sleep_ms(UPDATE_INTERVAL_MS)
