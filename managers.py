@@ -9,6 +9,8 @@ from utils.neopixelmanager import Pattern, Off
 from utils.midi import ControlChange
 from control_hardware import ControlAction, LEDMode
 
+MIDI_INTERVAL_MS = 8
+
 
 def _clamp_byte(value: int) -> int:
     """Clamp to the valid 7-bit MIDI data byte range (0-127)."""
@@ -188,6 +190,7 @@ class SnapManager:
                 if secondary
                 else self.pattern_map.SNAP_ACTIVE
             )
+
         return (
             self.pattern_map.SNAP_PASSIVE_SEC
             if secondary
@@ -222,6 +225,7 @@ class PresetManager:
             delta, self._msg_value = -1, self.midi_map.PRESET_DOWN_VAL
 
         self._value += delta
+
         # Wrap around 1 and the maximum
         if self._value < 1:
             self._value = self.preset_num
@@ -348,7 +352,7 @@ class ValueManager:
 
     # Encoder acceleration: consecutive steps arriving within these
     # intervals get a larger multiplier applied to param.step.
-    _ACCEL_FAST_MS = 30
+    _ACCEL_FAST_MS = 40
     _ACCEL_FAST_MULT = 4
     _ACCEL_MED_MS = 80
     _ACCEL_MED_MULT = 2
@@ -375,9 +379,11 @@ class ValueManager:
     def exec_action(self, control_action: ControlAction):
         """Selects the next target, or adjusts the current target's value.
         Retrieve the resulting message via msg()."""
-        if control_action == ControlAction.VALUE_TOGGLE:
+        if control_action == ControlAction.VALUE_DISP:
+            pass  # do nothing
+        elif control_action == ControlAction.VALUE_TOGGLE:
             self._index = (self._index + 1) % len(self.params)
-        else:
+        elif control_action in (ControlAction.VALUE_UP, ControlAction.VALUE_DOWN):
             param = self.params[self._index]
 
             now = time.ticks_ms()
@@ -396,7 +402,8 @@ class ValueManager:
             param.value = max(
                 param.min_value, min(param.max_value, param.value + delta)
             )
-        self._last_change_ms = time.ticks_ms()
+
+            self._last_change_ms = time.ticks_ms()
 
     def msg(self) -> ControlChange:
         param = self.params[self._index]

@@ -8,13 +8,7 @@ from collections import deque
 from tm1637 import TM1637
 from utils.neopixelmanager import NeoPixelManager, Off
 from utils.midi import Message, MidiUsb
-from control_hardware import (
-    Control,
-    ControlButton,
-    ControlEncoder,
-    ControlAction,
-    LEDMode,
-)
+from control_hardware import Control, ControlButton, ControlEncoder, ControlAction, LEDMode
 from managers import (
     ConfigError,
     MidiMap,
@@ -24,9 +18,8 @@ from managers import (
     LooperManager,
     ValueParam,
     ValueManager,
+    MIDI_INTERVAL_MS,
 )
-
-MIDI_INTERVAL_MS = 8
 
 
 class MidiController:
@@ -34,30 +27,28 @@ class MidiController:
     USB, and refreshes the LEDs and display."""
 
     _MSG_QUEUE_MAXLEN = 256
-
     _SNAP_ACTIONS = (
         ControlAction.SNAP_1_2,
         ControlAction.SNAP_3_4,
         ControlAction.SNAP_5_6,
         ControlAction.SNAP_7_8,
     )
-
     _LOOPER_ACTIONS = (
         ControlAction.LOOPER_REC_OD,
         ControlAction.LOOPER_STOP_PLAY,
         ControlAction.LOOPER_UNDO,
         ControlAction.LOOPER_CLEAR,
     )
-
     _VALUE_ACTIONS = (
         ControlAction.VALUE_UP,
         ControlAction.VALUE_DOWN,
         ControlAction.VALUE_TOGGLE,
+        ControlAction.VALUE_DISP,
     )
 
     def __init__(
         self,
-        control_buttons: list[ControlButton],
+        control_hardware: list[Control],
         np: NeoPixelManager,
         display: TM1637,
         midi_map: MidiMap,
@@ -66,35 +57,27 @@ class MidiController:
         pattern_map: PatternMap = PatternMap(),
         send_mode_msg: bool = False,
         led_map: list[LEDMode] = None,
-        control_encoder: ControlEncoder = None,
         value_params: list[ValueParam] = None,
         value_hang_ms: int = 1000,
     ):
         """
         Args:
-            control_buttons (list[ControlButton]): Buttons to poll.
+            control_hardware (list[Control]): Buttons and encoders to poll.
             np (NeoPixelManager): NeoPixel array manager.
             display (TM1637): Display manager.
             midi_map (MidiMap): MIDI channel and CC configuration.
             midi (MidiUsb): USB MIDI output used to send queued messages.
             preset_num (int, optional): Number of presets. Defaults to 8.
-            pattern_map (PatternMap, optional): LED patterns to use.
-                Defaults to all off.
-            send_mode_msg (bool, optional): Send a mode message before each
-                snap message. Defaults to False.
-            led_map (list[LEDMode], optional): LED mode for each NeoPixel
-                group, in order. Defaults to None.
-            control_encoder (ControlEncoder, optional): Encoder to poll.
-                Defaults to None.
-            value_params (list[ValueParam], optional): Value targets.
-                Defaults to None.
-            value_hang_ms (int, optional): How long a value stays on the
-                display after changing. Defaults to 1000.
+            pattern_map (PatternMap, optional): LED patterns to use. Defaults to all off.
+            send_mode_msg (bool, optional): Send a mode message before each snap message. Defaults to False.
+            led_map (list[LEDMode], optional): LED mode for each NeoPixel group, in order. Defaults to None.
+            value_params (list[ValueParam], optional): Value targets. Defaults to None.
+            value_hang_ms (int, optional): How long a value stays on the display after changing. Defaults to 1000.
 
         Raises:
             RuntimeError: If the configuration is invalid, or the message
                 queue overflows during operation. All NeoPixel groups are
-                turned off and the display shows "E<code>" (see
+                turned off and the display shows "E{code}" (see
                 ConfigError) before raising.
         """
         self.np = np
@@ -121,31 +104,28 @@ class MidiController:
         self.preset = PresetManager(midi_map=midi_map, preset_num=preset_num)
         self.looper = LooperManager(midi_map=midi_map, pattern_map=pattern_map)
 
-        self._hardware: list[Control] = list(control_buttons)
-        if control_encoder is not None:
-            self._hardware.append(control_encoder)
+        self._hardware: list[Control] = list(control_hardware)
 
-        self._validate_config(control_buttons, control_encoder, value_params)
+        self._validate_config(control_hardware, value_params)
 
         # MIDI message queue
         self.msg_queue = deque((), self._MSG_QUEUE_MAXLEN)
         self.msg_time: int = 0
 
         self.display.brightness(3)
-        self.display.show("    ")
+        self.display.show(" ")
 
-    def _configured_actions(
-        self, control_buttons: list[ControlButton], control_encoder: ControlEncoder
-    ) -> set:
+    def _configured_actions(self, control_hardware: list[Control]) -> set:
         """Every ControlAction assigned to any piece of control hardware."""
         actions = set()
-        for ctrl in control_buttons:
-            actions.add(ctrl.action_pressed)
-            actions.add(ctrl.action_short)
-            actions.add(ctrl.action_long)
-        if control_encoder is not None:
-            actions.add(control_encoder.action_cw)
-            actions.add(control_encoder.action_ccw)
+        for ctrl in control_hardware:
+            if isinstance(ctrl, ControlButton):
+                actions.add(ctrl.actions.PRESSED)
+                actions.add(ctrl.actions.SHORT)
+                actions.add(ctrl.actions.LONG)
+            elif isinstance(ctrl, ControlEncoder):
+                actions.add(ctrl.action_cw)
+                actions.add(ctrl.action_ccw)
         return actions
 
     def _fail(self, code: int):
@@ -158,8 +138,7 @@ class MidiController:
 
     def _validate_config(
         self,
-        control_buttons: list[ControlButton],
-        control_encoder: ControlEncoder,
+        control_hardware: list[Control],
         value_params: list[ValueParam],
     ):
         """Checks for configuration problems serious enough to prevent
@@ -171,7 +150,7 @@ class MidiController:
         except Exception:
             self._fail(ConfigError.LED_MAP_SIZE)
 
-        configured = self._configured_actions(control_buttons, control_encoder)
+        configured = self._configured_actions(control_hardware)
 
         # Value actions need value_params to be set
         if configured & set(self._VALUE_ACTIONS) and self.value is None:

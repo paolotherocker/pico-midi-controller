@@ -11,7 +11,7 @@ import time
 from tm1637 import TM1637
 from utils.midi import MidiUsb
 from midi_controller import MidiController, MidiMap, PatternMap, ValueParam
-from control_hardware import ControlButton, ControlEncoder, ControlAction, LEDMode
+from control_hardware import ControlButton, ControlEncoder, ControlAction, ActionMap, LEDMode
 
 # Main refresh interval
 UPDATE_INTERVAL = 5
@@ -62,11 +62,12 @@ PATTERN_MAP = PatternMap(
     looper_overdubbing=Solid((80, 0, 0)),  # Red
 )
 
+# Actions for each of the four main control buttons, in order
 CONTROLS_MAP = [
-    [ControlAction.NONE, ControlAction.SNAP_1_2, ControlAction.NONE],
-    [ControlAction.NONE, ControlAction.SNAP_3_4, ControlAction.PRESET_DOWN],
-    [ControlAction.NONE, ControlAction.SNAP_5_6, ControlAction.PRESET_UP],
-    [ControlAction.NONE, ControlAction.SNAP_7_8, ControlAction.NONE],
+    ActionMap(short=ControlAction.SNAP_1_2),
+    ActionMap(short=ControlAction.SNAP_3_4, long=ControlAction.PRESET_DOWN),
+    ActionMap(short=ControlAction.SNAP_5_6, long=ControlAction.PRESET_UP),
+    ActionMap(short=ControlAction.SNAP_7_8),
 ]
 
 # LED mode for each NeoPixel group, in order
@@ -85,35 +86,40 @@ VALUE_PARAMS = [
     ValueParam(
         label="V", cc=7, min_value=0, max_value=127, initial=100, step=1
     ),  # Volume
-    ValueParam(label="A", cc=12, min_value=0, max_value=127, initial=0),  # Param A
-    ValueParam(label="B", cc=13, min_value=0, max_value=127, initial=0),  # Param B
+    # ValueParam(label="A", cc=12, min_value=0, max_value=127, initial=0),  # Param A
+    # ValueParam(label="B", cc=13, min_value=0, max_value=127, initial=0),  # Param B
 ]
 
 # How long (ms) the value stays on screen after the last change
 VALUE_HANG_MS = 1000
 
-controls = []
+control_hardware = []
 for i in range(4):
-    controls.append(
+    control_hardware.append(
         ControlButton(
             pin=P_CONTROLS[i],
-            action_pressed=CONTROLS_MAP[i][0],
-            action_short=CONTROLS_MAP[i][1],
-            action_long=CONTROLS_MAP[i][2],
+            actions=CONTROLS_MAP[i],
         )
     )
 
 # Encoder switch and extra menu buttons
-controls.append(ControlButton(pin=P_ROTARY_SW, action_long=ControlAction.VALUE_TOGGLE))
-controls.append(
-    ControlButton(pin=P_MENU_BUTTONS[0], action_pressed=ControlAction.PRESET_UP)
+control_hardware.append(
+    ControlButton(
+        pin=P_ROTARY_SW,
+        actions=ActionMap(pressed=ControlAction.VALUE_DISP, long=ControlAction.VALUE_TOGGLE),
+    )
 )
-controls.append(
-    ControlButton(pin=P_MENU_BUTTONS[1], action_pressed=ControlAction.PRESET_DOWN)
+
+control_hardware.append(
+    ControlButton(pin=P_MENU_BUTTONS[0], actions=ActionMap(pressed=ControlAction.PRESET_UP))
+)
+
+control_hardware.append(
+    ControlButton(pin=P_MENU_BUTTONS[1], actions=ActionMap(pressed=ControlAction.PRESET_DOWN))
 )
 
 # Rotary encoder
-control_encoder = ControlEncoder(dt_pin=P_ROTARY_DT, clk_pin=P_ROTARY_CLK)
+control_hardware.append(ControlEncoder(dt_pin=P_ROTARY_DT, clk_pin=P_ROTARY_CLK))
 
 display = TM1637(clk=Pin(P_DISP_CLK), dio=Pin(P_DISP_DIO))
 
@@ -124,7 +130,7 @@ for i in range(NP_STRIP_NUM):
 midi = MidiUsb(product_str=MIDI_PRODUCT_STR)
 
 midi_controller = MidiController(
-    control_buttons=controls,
+    control_hardware=control_hardware,
     np=np_array,
     display=display,
     midi_map=MIDI_MAP,
@@ -132,7 +138,6 @@ midi_controller = MidiController(
     pattern_map=PATTERN_MAP,
     send_mode_msg=SEND_MODE_MSG,
     led_map=LED_MAP,
-    control_encoder=control_encoder,
     value_params=VALUE_PARAMS,
     value_hang_ms=VALUE_HANG_MS,
 )

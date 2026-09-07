@@ -19,6 +19,7 @@ class ControlAction:
     VALUE_UP = 11
     VALUE_DOWN = 12
     VALUE_TOGGLE = 13
+    VALUE_DISP = 14
 
 
 class LEDMode:
@@ -30,6 +31,24 @@ class LEDMode:
     SNAP_5_6 = 3
     SNAP_7_8 = 4
     LOOPER = 5
+
+
+class ActionMap:
+    """Actions reported by a ControlButton for each button event."""
+
+    PRESSED: ControlAction
+    SHORT: ControlAction
+    LONG: ControlAction
+
+    def __init__(
+        self,
+        pressed: ControlAction = ControlAction.NONE,
+        short: ControlAction = ControlAction.NONE,
+        long: ControlAction = ControlAction.NONE,
+    ):
+        self.PRESSED = pressed
+        self.SHORT = short
+        self.LONG = long
 
 
 class Control:
@@ -46,35 +65,29 @@ class ControlButton(Control):
     def __init__(
         self,
         pin: int,
-        action_pressed: ControlAction = ControlAction.NONE,
-        action_short: ControlAction = ControlAction.NONE,
-        action_long: ControlAction = ControlAction.NONE,
+        actions: ActionMap = ActionMap(),
         debounce_ms: int = 10,
         long_press_ms: int = 600,
     ):
         """
         Args:
             pin (int): GPIO pin number.
-            action_pressed (ControlAction, optional): Reported on press.
-            action_short (ControlAction, optional): Reported on short press.
-            action_long (ControlAction, optional): Reported on long press.
+            actions (ActionMap, optional): Actions for the press/short/long events.
             debounce_ms (int, optional): Debounce time. Defaults to 10.
             long_press_ms (int, optional): Long press threshold. Defaults to 600.
         """
         self._button = Button(pin, debounce_ms=debounce_ms, long_press_ms=long_press_ms)
-        self.action_pressed = action_pressed
-        self.action_short = action_short
-        self.action_long = action_long
+        self.actions = actions
 
     def update(self) -> ControlAction:
         event = self._button.consume()
 
         if event == ButtonEvent.PRESS:
-            return self.action_pressed
+            return self.actions.PRESSED
         elif event == ButtonEvent.SHORT_RELEASE:
-            return self.action_short
+            return self.actions.SHORT
         elif event == ButtonEvent.LONG_PRESS:
-            return self.action_long
+            return self.actions.LONG
 
         return ControlAction.NONE
 
