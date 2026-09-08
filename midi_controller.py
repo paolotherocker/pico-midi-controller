@@ -207,6 +207,10 @@ class MidiController:
                 self.np.set_pattern(pattern=pattern, subset_id=np_id)
                 self._led_pattern[np_id] = pattern
 
+    def _display_str(self) -> str:
+        """Idle display string: "P {preset}-{snap}", e.g. "P 1-1"."""
+        return "P {}-{}".format(self.preset.value(), self.snap.value())
+
     def update(self):
         for ctrl in self._hardware:
             self._handle_action(ctrl.update())
@@ -217,7 +221,7 @@ class MidiController:
         if self.value and self.value.is_active():
             self.display.show(self.value.display_str())
         else:
-            self.display.show(self.preset.display_str())
+            self.display.show(self._display_str())
 
         self.np.update()
         self.np.write()
