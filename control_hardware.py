@@ -55,8 +55,9 @@ class ActionMap:
 class Control:
     """Base class for control hardware."""
 
-    def update(self) -> ControlAction:
-        """Polls the hardware and returns the resulting action."""
+    def consume(self, mode: int = 0) -> ControlAction:
+        """Polls the hardware and returns the resulting action for the
+        given mode. Clears any pending hardware event."""
         raise NotImplementedError
 
 
@@ -83,17 +84,14 @@ class ControlButton(Control):
         self._button = Button(pin, debounce_ms=debounce_ms, long_press_ms=long_press_ms)
         self.actions_0 = actions_0
         self.actions_1 = actions_1
-        self.mode = 0
 
-    def set_mode(self, mode: int):
-        """Selects which ActionMap update() reports from."""
-        self.mode = mode
-
-    def update(self) -> ControlAction:
+    def consume(self, mode: int = 0) -> ControlAction:
+        """Polls the button and returns the action from the ActionMap
+        selected by mode."""
         event = self._button.consume()
         actions = (
             self.actions_1
-            if self.mode == 1 and self.actions_1 is not None
+            if mode == 1 and self.actions_1 is not None
             else self.actions_0
         )
 
@@ -132,7 +130,9 @@ class ControlEncoder(Control):
         self.action_cw = action_cw
         self.action_ccw = action_ccw
 
-    def update(self) -> ControlAction:
+    def consume(self, mode: int = 0) -> ControlAction:
+        """Polls the encoder and returns the resulting action. mode is
+        accepted for interface compatibility with Control but ignored."""
         event = self._encoder.consume()
 
         if event == RotaryEvent.CW:

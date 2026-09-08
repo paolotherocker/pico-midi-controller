@@ -165,21 +165,13 @@ class MidiController:
                 if param.min_value > param.max_value:
                     self._fail(ConfigError.VALUE_RANGE)
 
-    def _set_mode(self, mode: int):
-        """Switches system mode: updates every ControlButton's own mode
-        and selects the LED map used by _refresh_leds()."""
-        self.mode = mode
-        for ctrl in self._hardware:
-            if isinstance(ctrl, ControlButton):
-                ctrl.set_mode(mode)
-
     def _handle_action(self, action: ControlAction):
         """Handles a single action."""
         if action == ControlAction.NONE:
             return
 
         if action == ControlAction.MODE_TOGGLE:
-            self._set_mode(1 - self.mode)
+            self.mode = 1 - self.mode
 
         elif action in self._SNAP_ACTIONS:
             self.snap.exec_action(action)
@@ -228,7 +220,7 @@ class MidiController:
 
     def update(self):
         for ctrl in self._hardware:
-            self._handle_action(ctrl.update())
+            self._handle_action(ctrl.consume(self.mode))
 
         self._refresh_leds()
 
