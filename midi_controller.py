@@ -215,8 +215,9 @@ class MidiController:
                 self._led_pattern[np_id] = pattern
 
     def _display_str(self) -> str:
-        """Idle display string: "P {preset}-{snap}", e.g. "P 1-1"."""
-        return "P {}-{}".format(self.preset.value(), self.snap.value())
+        """Idle display string, right-aligned to the display's 4 digits:
+        "{preset}-{snap}", e.g. " 1-1" or "12-1"."""
+        return "{:>2}-{:.1}".format(self.preset.value(), str(self.snap.value()))
 
     def update(self):
         for ctrl in self._hardware:
