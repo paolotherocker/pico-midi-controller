@@ -1,8 +1,3 @@
-"""Top-level MidiController: polls control hardware, drives the SNAP,
-preset, looper, and value managers, sends the resulting MIDI messages
-over USB, and refreshes the NeoPixel array and display accordingly.
-"""
-
 import time
 from collections import deque
 from tm1637 import TM1637
@@ -56,7 +51,8 @@ class MidiController:
         preset_num: int = 8,
         pattern_map: PatternMap = PatternMap(),
         send_mode_msg: bool = False,
-        led_map: list[LEDMode] = None,
+        led_map_0: list[LEDMode] = None,
+        led_map_1: list[LEDMode] = None,
         value_params: list[ValueParam] = None,
         value_hang_ms: int = 1000,
     ):
@@ -70,7 +66,8 @@ class MidiController:
             preset_num (int, optional): Number of presets. Defaults to 8.
             pattern_map (PatternMap, optional): LED patterns to use. Defaults to all off.
             send_mode_msg (bool, optional): Send a mode message before each snap message. Defaults to False.
-            led_map (list[LEDMode], optional): LED mode for each NeoPixel group, in order. Defaults to None.
+            led_map_0 (list[LEDMode], optional): LED mode for each NeoPixel group in system mode 0, in order. Defaults to None.
+            led_map_1 (list[LEDMode], optional): LED mode for each NeoPixel group in system mode 1, in order. Defaults to led_map_0.
             value_params (list[ValueParam], optional): Value targets. Defaults to None.
             value_hang_ms (int, optional): How long a value stays on the display after changing. Defaults to 1000.
 
@@ -85,13 +82,15 @@ class MidiController:
         self.midi = midi
         self.pattern_map = pattern_map
         self.send_mode_msg = send_mode_msg
-        self.led_map = led_map or []
+        self.led_map_0 = led_map_0 or []
+        self.led_map_1 = led_map_1 if led_map_1 is not None else self.led_map_0
+        self.mode = 0
 
         # Tracks the Pattern instance last applied to each NeoPixel group,
         # so set_pattern() is only called on an actual change. Calling it
         # every update() would reset each pattern's internal start time
         # and freeze animated patterns (Pulse, Flash, Wave) at t=0.
-        self._led_pattern: list = [None] * len(self.led_map)
+        self._led_pattern: list = [None] * max(len(self.led_map_0), len(self.led_map_1))
 
         self.value = (
             ValueManager(midi_map=midi_map, params=value_params, hang_ms=value_hang_ms)
@@ -120,9 +119,13 @@ class MidiController:
         actions = set()
         for ctrl in control_hardware:
             if isinstance(ctrl, ControlButton):
-                actions.add(ctrl.actions.PRESSED)
-                actions.add(ctrl.actions.SHORT)
-                actions.add(ctrl.actions.LONG)
+                actions.add(ctrl.actions_0.PRESSED)
+                actions.add(ctrl.actions_0.SHORT)
+                actions.add(ctrl.actions_0.LONG)
+                if ctrl.actions_1 is not None:
+                    actions.add(ctrl.actions_1.PRESSED)
+                    actions.add(ctrl.actions_1.SHORT)
+                    actions.add(ctrl.actions_1.LONG)
             elif isinstance(ctrl, ControlEncoder):
                 actions.add(ctrl.action_cw)
                 actions.add(ctrl.action_ccw)
@@ -143,9 +146,9 @@ class MidiController:
     ):
         """Checks for configuration problems serious enough to prevent
         starting, and shows an error code instead of failing later."""
-        # led_map must fit within the NeoPixel array's actual groups
+        # led_map_0/led_map_1 must fit within the NeoPixel array's actual groups
         try:
-            for np_id in range(len(self.led_map)):
+            for np_id in range(len(self._led_pattern)):
                 self.np.set_pattern(pattern=Off(), subset_id=np_id)
         except Exception:
             self._fail(ConfigError.LED_MAP_SIZE)
@@ -162,12 +165,23 @@ class MidiController:
                 if param.min_value > param.max_value:
                     self._fail(ConfigError.VALUE_RANGE)
 
+    def _set_mode(self, mode: int):
+        """Switches system mode: updates every ControlButton's own mode
+        and selects the LED map used by _refresh_leds()."""
+        self.mode = mode
+        for ctrl in self._hardware:
+            if isinstance(ctrl, ControlButton):
+                ctrl.set_mode(mode)
+
     def _handle_action(self, action: ControlAction):
         """Handles a single action."""
         if action == ControlAction.NONE:
             return
 
-        if action in self._SNAP_ACTIONS:
+        if action == ControlAction.MODE_TOGGLE:
+            self._set_mode(1 - self.mode)
+
+        elif action in self._SNAP_ACTIONS:
             self.snap.exec_action(action)
             if self.send_mode_msg == True:
                 self.msg_queue.append(self.snap.snap_mode_msg())
@@ -196,7 +210,8 @@ class MidiController:
         set_pattern() when the pattern actually changed. Re-applying an
         unchanged pattern every frame would reset its start time and
         freeze animated patterns (Pulse, Flash, Wave)."""
-        for np_id, led_mode in enumerate(self.led_map):
+        led_map = self.led_map_0 if self.mode == 0 else self.led_map_1
+        for np_id, led_mode in enumerate(led_map):
             pattern = None
             if led_mode in SnapManager._ACTION_BY_LED_MODE:
                 pattern = self.snap.pattern(led_mode)

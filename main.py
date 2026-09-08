@@ -61,21 +61,32 @@ PATTERN_MAP = PatternMap(
     looper_overdubbing=Solid((80, 0, 0)),  # Red
 )
 
-# Actions for each of the four main control buttons, in order
-CONTROLS_MAP = [
-    ActionMap(short=ControlAction.SNAP_1_2),
-    ActionMap(short=ControlAction.SNAP_3_4, long=ControlAction.PRESET_DOWN),
-    ActionMap(short=ControlAction.SNAP_5_6, long=ControlAction.PRESET_UP),
-    ActionMap(short=ControlAction.SNAP_7_8),
+# Actions for each of the four main control buttons, mode 0 (snap/preset)
+CONTROLS_MAP_0 = [
+    ActionMap(pressed=ControlAction.SNAP_1_2),
+    ActionMap(pressed=ControlAction.SNAP_3_4, long=ControlAction.PRESET_DOWN),
+    ActionMap(pressed=ControlAction.SNAP_5_6, long=ControlAction.PRESET_UP),
+    ActionMap(pressed=ControlAction.SNAP_7_8, long=ControlAction.MODE_TOGGLE),
 ]
 
-# LED mode for each NeoPixel group, in order
-LED_MAP = [
+# Actions for each of the four main control buttons, mode 1 (looper)
+CONTROLS_MAP_1 = [
+    ActionMap(pressed=ControlAction.LOOPER_REC_OD, long=ControlAction.SNAP_1_2),
+    ActionMap(pressed=ControlAction.LOOPER_STOP_PLAY, long=ControlAction.SNAP_3_4),
+    ActionMap(pressed=ControlAction.LOOPER_CLEAR, long=ControlAction.SNAP_5_6),
+    ActionMap(pressed=ControlAction.LOOPER_UNDO, long=ControlAction.MODE_TOGGLE),
+]
+
+# LED mode for each NeoPixel group, mode 0
+LED_MAP_0 = [
     LEDMode.SNAP_1_2,
     LEDMode.SNAP_3_4,
     LEDMode.SNAP_5_6,
     LEDMode.SNAP_7_8,
 ]
+
+# LED mode for each NeoPixel group, mode 1 (all show looper status)
+LED_MAP_1 = [LEDMode.LOOPER] * 4
 
 # Send a mode message every time a snap message is sent
 SEND_MODE_MSG = True
@@ -97,7 +108,8 @@ for i in range(4):
     control_hardware.append(
         ControlButton(
             pin=P_CONTROLS[i],
-            actions=CONTROLS_MAP[i],
+            actions_0=CONTROLS_MAP_0[i],
+            actions_1=CONTROLS_MAP_1[i],
         )
     )
 
@@ -105,16 +117,16 @@ for i in range(4):
 control_hardware.append(
     ControlButton(
         pin=P_ROTARY_SW,
-        actions=ActionMap(pressed=ControlAction.VALUE_DISP, long=ControlAction.VALUE_TOGGLE),
+        actions_0=ActionMap(pressed=ControlAction.VALUE_DISP, long=ControlAction.VALUE_TOGGLE),
     )
 )
 
 control_hardware.append(
-    ControlButton(pin=P_MENU_BUTTONS[0], actions=ActionMap(pressed=ControlAction.PRESET_UP))
+    ControlButton(pin=P_MENU_BUTTONS[0], actions_0=ActionMap(pressed=ControlAction.PRESET_UP))
 )
 
 control_hardware.append(
-    ControlButton(pin=P_MENU_BUTTONS[1], actions=ActionMap(pressed=ControlAction.PRESET_DOWN))
+    ControlButton(pin=P_MENU_BUTTONS[1], actions_0=ActionMap(pressed=ControlAction.PRESET_DOWN))
 )
 
 # Rotary encoder
@@ -136,7 +148,8 @@ midi_controller = MidiController(
     midi=midi,
     pattern_map=PATTERN_MAP,
     send_mode_msg=SEND_MODE_MSG,
-    led_map=LED_MAP,
+    led_map_0=LED_MAP_0,
+    led_map_1=LED_MAP_1,
     value_params=VALUE_PARAMS,
     value_hang_ms=VALUE_HANG_MS,
 )

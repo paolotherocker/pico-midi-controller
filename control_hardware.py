@@ -20,6 +20,7 @@ class ControlAction:
     VALUE_DOWN = 12
     VALUE_TOGGLE = 13
     VALUE_DISP = 14
+    MODE_TOGGLE = 15
 
 
 class LEDMode:
@@ -65,29 +66,43 @@ class ControlButton(Control):
     def __init__(
         self,
         pin: int,
-        actions: ActionMap = ActionMap(),
+        actions_0: ActionMap = ActionMap(),
+        actions_1: ActionMap = None,
         debounce_ms: int = 10,
         long_press_ms: int = 600,
     ):
         """
         Args:
             pin (int): GPIO pin number.
-            actions (ActionMap, optional): Actions for the press/short/long events.
+            actions_0 (ActionMap, optional): Actions used in mode 0.
+            actions_1 (ActionMap, optional): Actions used in mode 1.
+                Defaults to None, which reuses actions_0 for mode 1.
             debounce_ms (int, optional): Debounce time. Defaults to 10.
             long_press_ms (int, optional): Long press threshold. Defaults to 600.
         """
         self._button = Button(pin, debounce_ms=debounce_ms, long_press_ms=long_press_ms)
-        self.actions = actions
+        self.actions_0 = actions_0
+        self.actions_1 = actions_1
+        self.mode = 0
+
+    def set_mode(self, mode: int):
+        """Selects which ActionMap update() reports from."""
+        self.mode = mode
 
     def update(self) -> ControlAction:
         event = self._button.consume()
+        actions = (
+            self.actions_1
+            if self.mode == 1 and self.actions_1 is not None
+            else self.actions_0
+        )
 
         if event == ButtonEvent.PRESS:
-            return self.actions.PRESSED
+            return actions.PRESSED
         elif event == ButtonEvent.SHORT_RELEASE:
-            return self.actions.SHORT
+            return actions.SHORT
         elif event == ButtonEvent.LONG_PRESS:
-            return self.actions.LONG
+            return actions.LONG
 
         return ControlAction.NONE
 
