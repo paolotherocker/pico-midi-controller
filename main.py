@@ -42,7 +42,6 @@ MIDI_MAP = MidiMap(
     preset_cc=20,
     preset_up_val=1,
     preset_down_val=2,
-    preset_mode_val=0,
     looper_cc=25,
     looper_ro_val=1,
     looper_sp_val=2,
