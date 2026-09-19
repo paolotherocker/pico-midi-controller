@@ -238,10 +238,6 @@ class PresetManager:
     def value(self) -> int:
         return self._value
 
-    def display_str(self) -> str:
-        """Formatted display string, e.g. "P  1"."""
-        return "P{:3d}".format(self._value)
-
 
 class LooperManager:
     """State machine for the loop transport: record, play, overdub, and
