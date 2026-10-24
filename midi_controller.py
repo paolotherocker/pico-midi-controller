@@ -62,7 +62,7 @@ class MidiController:
         np: NeoPixelManager,
         display: TM1637,
         midi_map: MidiMap,
-        midi: MidiUsb,
+        midi_usb: MidiUsb = None,
         preset_num: int = 8,
         pattern_map: PatternMap = PatternMap(),
         send_mode_msg: bool = False,
@@ -77,7 +77,9 @@ class MidiController:
             np (NeoPixelManager): NeoPixel array manager.
             display (TM1637): Display manager.
             midi_map (MidiMap): MIDI channel and CC configuration.
-            midi (MidiUsb): USB MIDI output used to send queued messages.
+            midi_usb (MidiUsb, optional): USB MIDI output used to send
+                queued messages. If None, messages are printed to the
+                serial console instead. Defaults to None.
             preset_num (int, optional): Number of presets. Defaults to 8.
             pattern_map (PatternMap, optional): LED patterns to use.
                 Defaults to all off.
@@ -100,7 +102,7 @@ class MidiController:
         """
         self.np = np
         self.display = display
-        self.midi = midi
+        self.midi_usb = midi_usb
         self.pattern_map = pattern_map
         self.send_mode_msg = send_mode_msg
         self.led_map = led_map or []
@@ -108,7 +110,7 @@ class MidiController:
         # Tracks the Pattern instance last applied to each NeoPixel group,
         # so set_pattern() is only called on an actual change. Calling it
         # every update() would reset each pattern's internal start time
-        # and freeze animated patterns (Pulse, Flash, Wave) at t=0.
+        # and freeze animated patterns (Pulse, Flash, Wave).
         self._led_pattern: list = [None] * len(self.led_map)
 
         self.value = (
@@ -234,6 +236,14 @@ class MidiController:
         "{preset}-{snap}", e.g. " 1-1" or "12-1"."""
         return "{:>2}-{:.1}".format(self.preset.value(), str(self.snap.value()))
 
+    def _send(self, msg: Message):
+        """Sends a message over USB if open, or prints it when no USB
+        interface was given."""
+        if self.midi_usb is None:
+            print(msg.to_bytes())
+        elif self.midi_usb.is_open():
+            self.midi_usb.send_message(msg)
+
     def update(self):
         for ctrl in self._hardware:
             self._handle_action(ctrl.update())
@@ -253,6 +263,4 @@ class MidiController:
         if time.ticks_diff(now, self.msg_time) > MIDI_INTERVAL_MS:
             if len(self.msg_queue) > 0:
                 self.msg_time = now
-                msg: Message = self.msg_queue.popleft()
-                if self.midi.is_open():
-                    self.midi.send_message(msg)
+                self._send(self.msg_queue.popleft())

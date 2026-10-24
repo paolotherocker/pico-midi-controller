@@ -127,14 +127,19 @@ np_array = NeoPixelManager(pin_id=P_NP, n=NP_STRIP_LEN * NP_STRIP_NUM)
 for i in range(NP_STRIP_NUM):
     np_array.add_subset(NP_STRIP_LEN)
 
-midi = MidiUsb(product_str=MIDI_PRODUCT_STR)
+# Without USB MIDI support (e.g. in a simulator), MIDI messages are printed
+midi_usb = None
+try:
+    midi_usb = MidiUsb(product_str=MIDI_PRODUCT_STR)
+except (RuntimeError, OSError) as err:
+    print("USB MIDI unavailable ({}); printing MIDI messages instead".format(err))
 
 midi_controller = MidiController(
     control_buttons=controls,
     np=np_array,
     display=display,
     midi_map=MIDI_MAP,
-    midi=midi,
+    midi_usb=midi_usb,
     pattern_map=PATTERN_MAP,
     send_mode_msg=SEND_MODE_MSG,
     led_map=LED_MAP,
