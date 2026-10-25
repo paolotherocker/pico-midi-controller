@@ -89,8 +89,8 @@ VALUE_PARAMS = [
     # ValueParam(label="B", cc=13, min_value=0, max_value=127, initial=0),  # Param B
 ]
 
-# How long (ms) the value stays on screen after the last change
-VALUE_HANG_MS = 1000
+# How long (ms) a command message stays on the display
+DISPLAY_HANG_MS = 1000
 
 controls = []
 for i in range(4):
@@ -145,7 +145,7 @@ midi_controller = MidiController(
     led_map=LED_MAP,
     control_encoder=control_encoder,
     value_params=VALUE_PARAMS,
-    value_hang_ms=VALUE_HANG_MS,
+    display_hang_ms=DISPLAY_HANG_MS,
 )
 
 while True:

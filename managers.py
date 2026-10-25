@@ -178,6 +178,11 @@ class SnapManager:
     def value(self) -> int:
         return self._value
 
+    def display_str(self) -> str:
+        """"S" in the second position and the snap number in the last,
+        e.g. " S 3"."""
+        return " S{:>2d}".format(self._value)
+
     def pattern(self, led_mode: LEDMode) -> Pattern:
         """LED pattern for a SNAP group."""
         control_action = self._ACTION_BY_LED_MODE[led_mode]
@@ -238,6 +243,11 @@ class PresetManager:
     def value(self) -> int:
         return self._value
 
+    def display_str(self) -> str:
+        """"P" in the second position and the preset number in the last,
+        e.g. " P 1" or " P12"."""
+        return " P{:>2d}".format(self._value)
+
 
 class LooperManager:
     """State machine for the loop transport: record, play, overdub, and
@@ -249,11 +259,20 @@ class LooperManager:
     _OVERDUBBING = 3
     _STOPPED = 4
 
+    # Four-character, 7-segment friendly labels.
+    _TXT_REC = "rEC "
+    _TXT_PLAY = "PLAY"
+    _TXT_OVERDUB = "OdUb"
+    _TXT_STOP = "StOP"
+    _TXT_CLEAR = "CLr "
+    _TXT_UNDO = "UndO"
+
     def __init__(self, midi_map: MidiMap, pattern_map: PatternMap):
         self.midi_map = midi_map
         self.pattern_map = pattern_map
         self.state = self._EMPTY
         self._msg_value = midi_map.LOOPER_UNDO_VAL
+        self._text = self._TXT_STOP
 
     def exec_action(self, control_action: ControlAction):
         """Advances the state machine. Retrieve the resulting message via
@@ -268,6 +287,12 @@ class LooperManager:
             elif self.state == self._OVERDUBBING:
                 self.state = self._PLAYING
             self._msg_value = self.midi_map.LOOPER_RO_VAL
+            if self.state == self._RECORDING:
+                self._text = self._TXT_REC
+            elif self.state == self._OVERDUBBING:
+                self._text = self._TXT_OVERDUB
+            else:
+                self._text = self._TXT_PLAY
 
         elif control_action == ControlAction.LOOPER_STOP_PLAY:
             if self.state in (
@@ -279,13 +304,18 @@ class LooperManager:
             elif self.state == self._STOPPED:
                 self.state = self._PLAYING
             self._msg_value = self.midi_map.LOOPER_SP_VAL
+            self._text = (
+                self._TXT_PLAY if self.state == self._PLAYING else self._TXT_STOP
+            )
 
         elif control_action == ControlAction.LOOPER_CLEAR:
             self.state = self._EMPTY
             self._msg_value = self.midi_map.LOOPER_CLEAR_VAL
+            self._text = self._TXT_CLEAR
 
         else:  # ControlAction.LOOPER_UNDO -- does not change the transport state.
             self._msg_value = self.midi_map.LOOPER_UNDO_VAL
+            self._text = self._TXT_UNDO
 
     def msg(self) -> ControlChange:
         return ControlChange(
@@ -293,6 +323,12 @@ class LooperManager:
             controller=self.midi_map.LOOPER_CC,
             value=self._msg_value,
         )
+
+    def display_str(self) -> str:
+        """Label for the latest loop command: "rEC ", "PLAY", "OdUb",
+        "StOP", "CLr " or "UndO". Shows the resulting state for record
+        and stop/play."""
+        return self._text
 
     def pattern(self) -> Pattern:
         if self.state == self._RECORDING:
@@ -349,23 +385,20 @@ class ValueManager:
     _ACCEL_MED_MS = 80
     _ACCEL_MED_MULT = 2
 
-    def __init__(
-        self, midi_map: MidiMap, params: list[ValueParam], hang_ms: int = 1000
-    ):
+    def __init__(self, midi_map: MidiMap, params: list[ValueParam]):
         """
         Args:
             midi_map (MidiMap): MIDI channel configuration.
             params (list[ValueParam]): Value targets to cycle through.
-            hang_ms (int, optional): How long is_active() stays true after
-                a change. Defaults to 1000.
+
+        Raises:
+            ValueError: If params is empty.
         """
         if not params:
             raise ValueError("ValueManager needs at least one ValueParam")
         self.midi_map = midi_map
         self.params = params
-        self.hang_ms = hang_ms
         self._index = 0
-        self._last_change_ms = 0
         self._last_step_ms = 0
 
     def exec_action(self, control_action: ControlAction):
@@ -395,7 +428,6 @@ class ValueManager:
             param.value = max(
                 param.min_value, min(param.max_value, param.value + delta)
             )
-        self._last_change_ms = time.ticks_ms()
 
     def msg(self) -> ControlChange:
         param = self.params[self._index]
@@ -406,10 +438,6 @@ class ValueManager:
             controller=param.cc,
             value=param.value,
         )
-
-    def is_active(self) -> bool:
-        """True if a value changed recently."""
-        return time.ticks_diff(time.ticks_ms(), self._last_change_ms) < self.hang_ms
 
     def display_str(self) -> str:
         """Formatted display string, e.g. "V068"."""
