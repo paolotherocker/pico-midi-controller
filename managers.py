@@ -78,12 +78,19 @@ class MidiMap:
 
 
 class PatternMap:
-    """NeoPixel patterns for each LED state. Unset patterns stay off."""
+    """NeoPixel patterns for each LED state. Unset patterns stay off.
+    Each snap (1-8) has its own active pattern; passive groups share
+    one pattern."""
 
-    SNAP_ACTIVE: Pattern
-    SNAP_ACTIVE_SEC: Pattern
+    SNAP_ACTIVE_1: Pattern
+    SNAP_ACTIVE_2: Pattern
+    SNAP_ACTIVE_3: Pattern
+    SNAP_ACTIVE_4: Pattern
+    SNAP_ACTIVE_5: Pattern
+    SNAP_ACTIVE_6: Pattern
+    SNAP_ACTIVE_7: Pattern
+    SNAP_ACTIVE_8: Pattern
     SNAP_PASSIVE: Pattern
-    SNAP_PASSIVE_SEC: Pattern
     LOOPER_EMPTY: Pattern
     LOOPER_RECORDING: Pattern
     LOOPER_PLAYING: Pattern
@@ -92,20 +99,30 @@ class PatternMap:
 
     def __init__(
         self,
-        snap_active: Pattern = Off(),
-        snap_active_sec: Pattern = Off(),
+        snap_active_1: Pattern = Off(),
+        snap_active_2: Pattern = Off(),
+        snap_active_3: Pattern = Off(),
+        snap_active_4: Pattern = Off(),
+        snap_active_5: Pattern = Off(),
+        snap_active_6: Pattern = Off(),
+        snap_active_7: Pattern = Off(),
+        snap_active_8: Pattern = Off(),
         snap_passive: Pattern = Off(),
-        snap_passive_sec: Pattern = Off(),
         looper_empty: Pattern = Off(),
         looper_recording: Pattern = Off(),
         looper_playing: Pattern = Off(),
         looper_overdubbing: Pattern = Off(),
         looper_stopped: Pattern = Off(),
     ):
-        self.SNAP_ACTIVE = snap_active
-        self.SNAP_ACTIVE_SEC = snap_active_sec
+        self.SNAP_ACTIVE_1 = snap_active_1
+        self.SNAP_ACTIVE_2 = snap_active_2
+        self.SNAP_ACTIVE_3 = snap_active_3
+        self.SNAP_ACTIVE_4 = snap_active_4
+        self.SNAP_ACTIVE_5 = snap_active_5
+        self.SNAP_ACTIVE_6 = snap_active_6
+        self.SNAP_ACTIVE_7 = snap_active_7
+        self.SNAP_ACTIVE_8 = snap_active_8
         self.SNAP_PASSIVE = snap_passive
-        self.SNAP_PASSIVE_SEC = snap_passive_sec
         self.LOOPER_EMPTY = looper_empty
         self.LOOPER_RECORDING = looper_recording
         self.LOOPER_PLAYING = looper_playing
@@ -140,6 +157,18 @@ class SnapManager:
             channel=midi_map.CHANNEL,
             controller=midi_map.SNAP_CC,
             value=midi_map.SNAP_MODE_VAL,
+        )
+
+        # Active pattern for each snap, indexed by snap number - 1.
+        self._active_patterns = (
+            pattern_map.SNAP_ACTIVE_1,
+            pattern_map.SNAP_ACTIVE_2,
+            pattern_map.SNAP_ACTIVE_3,
+            pattern_map.SNAP_ACTIVE_4,
+            pattern_map.SNAP_ACTIVE_5,
+            pattern_map.SNAP_ACTIVE_6,
+            pattern_map.SNAP_ACTIVE_7,
+            pattern_map.SNAP_ACTIVE_8,
         )
 
         # Starts on SNAP 1/2 active, no secondary values set.
@@ -184,20 +213,12 @@ class SnapManager:
         return " S{:>2d}".format(self._value)
 
     def pattern(self, led_mode: LEDMode) -> Pattern:
-        """LED pattern for a SNAP group."""
+        """LED pattern for a SNAP group: the active snap's own pattern
+        for the active group, the shared passive pattern otherwise."""
         control_action = self._ACTION_BY_LED_MODE[led_mode]
-        secondary = self._secondary.get(control_action, False)
         if control_action == self.active_action:
-            return (
-                self.pattern_map.SNAP_ACTIVE_SEC
-                if secondary
-                else self.pattern_map.SNAP_ACTIVE
-            )
-        return (
-            self.pattern_map.SNAP_PASSIVE_SEC
-            if secondary
-            else self.pattern_map.SNAP_PASSIVE
-        )
+            return self._active_patterns[self._value - 1]
+        return self.pattern_map.SNAP_PASSIVE
 
 
 class PresetManager:
