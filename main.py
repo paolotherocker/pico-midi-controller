@@ -51,30 +51,35 @@ MIDI_MAP = MidiMap(
 )
 
 PATTERN_MAP = PatternMap(
-    snap_active=Wave((3, 0, 3), (30, 0, 30), period_ms=3000, spread=1),
-    snap_active_sec=Wave((0, 0, 6), (0, 0, 60), period_ms=3000, spread=1),
-    snap_passive=Solid((0, 0, 0)),
-    snap_passive_sec=Solid((0, 0, 0)),
-    looper_empty=Solid((0, 80, 0)),  # Green
-    looper_stopped=Solid((0, 40, 40)),  # Yellow
-    looper_playing=Solid((0, 40, 40)),  # Yellow
-    looper_recording=Solid((80, 0, 0)),  # Red
-    looper_overdubbing=Solid((80, 0, 0)),  # Red
+    snap_active_1=Wave((0, 0, 6), (0, 0, 60), period_ms=4000, spread=1),  # Blue
+    snap_active_2=Wave((2, 0, 4), (20, 0, 40), period_ms=2000, spread=1),  # Purple
+    snap_active_3=Wave((6, 0, 0), (60, 0, 0), period_ms=4000, spread=1),  # Red
+    snap_active_4=Wave((5, 0, 1), (50, 0, 10), period_ms=2000, spread=1),  # Pink
+    snap_active_5=Wave((0, 0, 6), (0, 0, 60), period_ms=4000, spread=1),  # Blue
+    snap_active_6=Wave((2, 0, 4), (20, 0, 40), period_ms=2000, spread=1),  # Purple
+    snap_active_7=Wave((6, 0, 0), (60, 0, 0), period_ms=4000, spread=1),  # Red
+    snap_active_8=Wave((5, 0, 1), (50, 0, 10), period_ms=2000, spread=1),  # Pink
+    snap_passive=Off(),
+    looper_empty=Off(),
+    looper_stopped=Solid((0, 40, 0)),  # Green
+    looper_playing=Wave((3, 3, 0), (30, 30, 0), period_ms=2000, spread=1),  # Yellow
+    looper_recording=Wave((6, 0, 0), (60, 0, 0), period_ms=2000, spread=1),  # Red
+    looper_overdubbing=Wave((6, 0, 0), (60, 0, 0), period_ms=2000, spread=1),  # Red
 )
 
 CONTROLS_MAP = [
-    [ControlAction.NONE, ControlAction.SNAP_1_2, ControlAction.NONE],
-    [ControlAction.NONE, ControlAction.SNAP_3_4, ControlAction.PRESET_DOWN],
-    [ControlAction.NONE, ControlAction.SNAP_5_6, ControlAction.PRESET_UP],
+    [ControlAction.NONE, ControlAction.SNAP_5_6, ControlAction.NONE],
     [ControlAction.NONE, ControlAction.SNAP_7_8, ControlAction.NONE],
+    [ControlAction.NONE, ControlAction.SNAP_3_4, ControlAction.NONE],
+    [ControlAction.NONE, ControlAction.SNAP_1_2, ControlAction.NONE],
 ]
 
 # LED mode for each NeoPixel group, in order
 LED_MAP = [
-    LEDMode.SNAP_1_2,
-    LEDMode.SNAP_3_4,
     LEDMode.SNAP_5_6,
     LEDMode.SNAP_7_8,
+    LEDMode.SNAP_3_4,
+    LEDMode.SNAP_1_2,
 ]
 
 # Send a mode message every time a snap message is sent
@@ -85,12 +90,12 @@ VALUE_PARAMS = [
     ValueParam(
         label="V", cc=7, min_value=0, max_value=127, initial=100, step=1
     ),  # Volume
-    ValueParam(label="A", cc=12, min_value=0, max_value=127, initial=0),  # Param A
-    ValueParam(label="B", cc=13, min_value=0, max_value=127, initial=0),  # Param B
+    # ValueParam(label="A", cc=12, min_value=0, max_value=127, initial=0),  # Param A
+    # ValueParam(label="B", cc=13, min_value=0, max_value=127, initial=0),  # Param B
 ]
 
-# How long (ms) the value stays on screen after the last change
-VALUE_HANG_MS = 1000
+# How long (ms) a command message stays on the display
+DISPLAY_HANG_MS = 500
 
 controls = []
 for i in range(4):
@@ -104,7 +109,13 @@ for i in range(4):
     )
 
 # Encoder switch and extra menu buttons
-controls.append(ControlButton(pin=P_ROTARY_SW, action_long=ControlAction.VALUE_TOGGLE))
+controls.append(
+    ControlButton(
+        pin=P_ROTARY_SW,
+        action_pressed=ControlAction.VALUE_DISP,
+        action_long=ControlAction.VALUE_TOGGLE,
+    )
+)
 controls.append(
     ControlButton(pin=P_MENU_BUTTONS[0], action_pressed=ControlAction.PRESET_UP)
 )
@@ -121,20 +132,25 @@ np_array = NeoPixelManager(pin_id=P_NP, n=NP_STRIP_LEN * NP_STRIP_NUM)
 for i in range(NP_STRIP_NUM):
     np_array.add_subset(NP_STRIP_LEN)
 
-midi = MidiUsb(product_str=MIDI_PRODUCT_STR)
+# Without USB MIDI support (e.g. in a simulator), MIDI messages are printed
+midi_usb = None
+try:
+    midi_usb = MidiUsb(product_str=MIDI_PRODUCT_STR)
+except (RuntimeError, OSError) as err:
+    print("USB MIDI unavailable ({}); printing MIDI messages instead".format(err))
 
 midi_controller = MidiController(
     control_buttons=controls,
     np=np_array,
     display=display,
     midi_map=MIDI_MAP,
-    midi=midi,
+    midi_usb=midi_usb,
     pattern_map=PATTERN_MAP,
     send_mode_msg=SEND_MODE_MSG,
     led_map=LED_MAP,
     control_encoder=control_encoder,
     value_params=VALUE_PARAMS,
-    value_hang_ms=VALUE_HANG_MS,
+    display_hang_ms=DISPLAY_HANG_MS,
 )
 
 while True:

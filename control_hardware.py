@@ -19,6 +19,7 @@ class ControlAction:
     VALUE_UP = 11
     VALUE_DOWN = 12
     VALUE_TOGGLE = 13
+    VALUE_DISP = 14
 
 
 class LEDMode:

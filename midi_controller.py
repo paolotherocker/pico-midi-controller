@@ -31,9 +31,12 @@ MIDI_INTERVAL_MS = 8
 
 class MidiController:
     """Generates MIDI messages from control hardware, sends them over
-    USB, and refreshes the LEDs and display."""
+    USB, and refreshes the LEDs and display. The display is blank except
+    for a short message after each command."""
 
     _MSG_QUEUE_MAXLEN = 256
+
+    _BLANK = "    "
 
     _SNAP_ACTIONS = (
         ControlAction.SNAP_1_2,
@@ -53,6 +56,7 @@ class MidiController:
         ControlAction.VALUE_UP,
         ControlAction.VALUE_DOWN,
         ControlAction.VALUE_TOGGLE,
+        ControlAction.VALUE_DISP,
     )
 
     def __init__(
@@ -61,14 +65,14 @@ class MidiController:
         np: NeoPixelManager,
         display: TM1637,
         midi_map: MidiMap,
-        midi: MidiUsb,
+        midi_usb: MidiUsb = None,
         preset_num: int = 8,
         pattern_map: PatternMap = PatternMap(),
         send_mode_msg: bool = False,
         led_map: list[LEDMode] = None,
         control_encoder: ControlEncoder = None,
         value_params: list[ValueParam] = None,
-        value_hang_ms: int = 1000,
+        display_hang_ms: int = 1000,
     ):
         """
         Args:
@@ -76,7 +80,9 @@ class MidiController:
             np (NeoPixelManager): NeoPixel array manager.
             display (TM1637): Display manager.
             midi_map (MidiMap): MIDI channel and CC configuration.
-            midi (MidiUsb): USB MIDI output used to send queued messages.
+            midi_usb (MidiUsb, optional): USB MIDI output used to send
+                queued messages. If None, messages are printed to the
+                serial console instead. Defaults to None.
             preset_num (int, optional): Number of presets. Defaults to 8.
             pattern_map (PatternMap, optional): LED patterns to use.
                 Defaults to all off.
@@ -88,8 +94,9 @@ class MidiController:
                 Defaults to None.
             value_params (list[ValueParam], optional): Value targets.
                 Defaults to None.
-            value_hang_ms (int, optional): How long a value stays on the
-                display after changing. Defaults to 1000.
+            display_hang_ms (int, optional): How long the message for a
+                command stays on the display, in milliseconds. Defaults
+                to 1000.
 
         Raises:
             RuntimeError: If the configuration is invalid, or the message
@@ -99,19 +106,20 @@ class MidiController:
         """
         self.np = np
         self.display = display
-        self.midi = midi
+        self.midi_usb = midi_usb
         self.pattern_map = pattern_map
         self.send_mode_msg = send_mode_msg
         self.led_map = led_map or []
+        self.display_hang_ms = display_hang_ms
 
         # Tracks the Pattern instance last applied to each NeoPixel group,
         # so set_pattern() is only called on an actual change. Calling it
         # every update() would reset each pattern's internal start time
-        # and freeze animated patterns (Pulse, Flash, Wave) at t=0.
+        # and freeze animated patterns (Pulse, Flash, Wave).
         self._led_pattern: list = [None] * len(self.led_map)
 
         self.value = (
-            ValueManager(midi_map=midi_map, params=value_params, hang_ms=value_hang_ms)
+            ValueManager(midi_map=midi_map, params=value_params)
             if value_params is not None
             else None
         )
@@ -120,6 +128,12 @@ class MidiController:
         self.snap = SnapManager(midi_map=midi_map, pattern_map=pattern_map)
         self.preset = PresetManager(midi_map=midi_map, preset_num=preset_num)
         self.looper = LooperManager(midi_map=midi_map, pattern_map=pattern_map)
+
+        # Message for the latest command and when it was posted. A new
+        # command replaces it and restarts the timeout.
+        self._message: str = None
+        self._message_ms: int = 0
+        self._display_shown = self._BLANK
 
         self._hardware: list[Control] = list(control_buttons)
         if control_encoder is not None:
@@ -132,7 +146,7 @@ class MidiController:
         self.msg_time: int = 0
 
         self.display.brightness(3)
-        self.display.show("    ")
+        self.display.show(self._BLANK)
 
     def _configured_actions(
         self, control_buttons: list[ControlButton], control_encoder: ControlEncoder
@@ -183,6 +197,11 @@ class MidiController:
                 if param.min_value > param.max_value:
                     self._fail(ConfigError.VALUE_RANGE)
 
+    def _post_message(self, text: str):
+        """Replaces the display message and restarts its timeout."""
+        self._message = text
+        self._message_ms = time.ticks_ms()
+
     def _handle_action(self, action: ControlAction):
         """Handles a single action."""
         if action == ControlAction.NONE:
@@ -190,23 +209,27 @@ class MidiController:
 
         if action in self._SNAP_ACTIONS:
             self.snap.exec_action(action)
+            self._post_message(self.snap.display_str())
             if self.send_mode_msg == True:
                 self.msg_queue.append(self.snap.snap_mode_msg())
             self.msg_queue.append(self.snap.msg())
 
         elif action in (ControlAction.PRESET_UP, ControlAction.PRESET_DOWN):
             self.preset.exec_action(action)
+            self._post_message(self.preset.display_str())
             self.msg_queue.append(self.preset.msg())
             self.snap.reset()
             self.msg_queue.append(self.snap.msg())
 
         elif action in self._LOOPER_ACTIONS:
             self.looper.exec_action(action)
+            self._post_message(self.looper.display_str())
             self.msg_queue.append(self.looper.msg())
 
         elif action in self._VALUE_ACTIONS:
             if self.value:
                 self.value.exec_action(action)
+                self._post_message(self.value.display_str())
                 self.msg_queue.append(self.value.msg())
 
         if len(self.msg_queue) >= self._MSG_QUEUE_MAXLEN:
@@ -228,17 +251,40 @@ class MidiController:
                 self.np.set_pattern(pattern=pattern, subset_id=np_id)
                 self._led_pattern[np_id] = pattern
 
+    def is_display_active(self) -> bool:
+        """True if a command message was posted within the last
+        display_hang_ms."""
+        if self._message is None:
+            return False
+        return (
+            time.ticks_diff(time.ticks_ms(), self._message_ms) < self.display_hang_ms
+        )
+
+    def _refresh_display(self):
+        """Shows the current message while active, and blanks the
+        display otherwise. Only writes to the display when the text
+        changes, to keep the bit-banged TM1637 bus quiet."""
+        text = self._message if self.is_display_active() else self._BLANK
+        if text != self._display_shown:
+            self.display.show(text)
+            self._display_shown = text
+
+    def _send(self, msg: Message):
+        """Sends a message over USB if open, or prints it when no USB
+        interface was given."""
+        if self.midi_usb is None:
+            print(msg.to_bytes())
+        elif self.midi_usb.is_open():
+            self.midi_usb.send_message(msg)
+
     def update(self):
+        """Polls the hardware once and refreshes the LEDs, display and
+        MIDI output. Call every few milliseconds from the main loop."""
         for ctrl in self._hardware:
             self._handle_action(ctrl.update())
 
         self._refresh_leds()
-
-        # Refresh Display
-        if self.value and self.value.is_active():
-            self.display.show(self.value.display_str())
-        else:
-            self.display.show(self.preset.display_str())
+        self._refresh_display()
 
         self.np.update()
         self.np.write()
@@ -247,6 +293,4 @@ class MidiController:
         if time.ticks_diff(now, self.msg_time) > MIDI_INTERVAL_MS:
             if len(self.msg_queue) > 0:
                 self.msg_time = now
-                msg: Message = self.msg_queue.popleft()
-                if self.midi.is_open():
-                    self.midi.send_message(msg)
+                self._send(self.msg_queue.popleft())

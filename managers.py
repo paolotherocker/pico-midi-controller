@@ -78,12 +78,19 @@ class MidiMap:
 
 
 class PatternMap:
-    """NeoPixel patterns for each LED state. Unset patterns stay off."""
+    """NeoPixel patterns for each LED state. Unset patterns stay off.
+    Each snap (1-8) has its own active pattern; passive groups share
+    one pattern."""
 
-    SNAP_ACTIVE: Pattern
-    SNAP_ACTIVE_SEC: Pattern
+    SNAP_ACTIVE_1: Pattern
+    SNAP_ACTIVE_2: Pattern
+    SNAP_ACTIVE_3: Pattern
+    SNAP_ACTIVE_4: Pattern
+    SNAP_ACTIVE_5: Pattern
+    SNAP_ACTIVE_6: Pattern
+    SNAP_ACTIVE_7: Pattern
+    SNAP_ACTIVE_8: Pattern
     SNAP_PASSIVE: Pattern
-    SNAP_PASSIVE_SEC: Pattern
     LOOPER_EMPTY: Pattern
     LOOPER_RECORDING: Pattern
     LOOPER_PLAYING: Pattern
@@ -92,20 +99,30 @@ class PatternMap:
 
     def __init__(
         self,
-        snap_active: Pattern = Off(),
-        snap_active_sec: Pattern = Off(),
+        snap_active_1: Pattern = Off(),
+        snap_active_2: Pattern = Off(),
+        snap_active_3: Pattern = Off(),
+        snap_active_4: Pattern = Off(),
+        snap_active_5: Pattern = Off(),
+        snap_active_6: Pattern = Off(),
+        snap_active_7: Pattern = Off(),
+        snap_active_8: Pattern = Off(),
         snap_passive: Pattern = Off(),
-        snap_passive_sec: Pattern = Off(),
         looper_empty: Pattern = Off(),
         looper_recording: Pattern = Off(),
         looper_playing: Pattern = Off(),
         looper_overdubbing: Pattern = Off(),
         looper_stopped: Pattern = Off(),
     ):
-        self.SNAP_ACTIVE = snap_active
-        self.SNAP_ACTIVE_SEC = snap_active_sec
+        self.SNAP_ACTIVE_1 = snap_active_1
+        self.SNAP_ACTIVE_2 = snap_active_2
+        self.SNAP_ACTIVE_3 = snap_active_3
+        self.SNAP_ACTIVE_4 = snap_active_4
+        self.SNAP_ACTIVE_5 = snap_active_5
+        self.SNAP_ACTIVE_6 = snap_active_6
+        self.SNAP_ACTIVE_7 = snap_active_7
+        self.SNAP_ACTIVE_8 = snap_active_8
         self.SNAP_PASSIVE = snap_passive
-        self.SNAP_PASSIVE_SEC = snap_passive_sec
         self.LOOPER_EMPTY = looper_empty
         self.LOOPER_RECORDING = looper_recording
         self.LOOPER_PLAYING = looper_playing
@@ -140,6 +157,18 @@ class SnapManager:
             channel=midi_map.CHANNEL,
             controller=midi_map.SNAP_CC,
             value=midi_map.SNAP_MODE_VAL,
+        )
+
+        # Active pattern for each snap, indexed by snap number - 1.
+        self._active_patterns = (
+            pattern_map.SNAP_ACTIVE_1,
+            pattern_map.SNAP_ACTIVE_2,
+            pattern_map.SNAP_ACTIVE_3,
+            pattern_map.SNAP_ACTIVE_4,
+            pattern_map.SNAP_ACTIVE_5,
+            pattern_map.SNAP_ACTIVE_6,
+            pattern_map.SNAP_ACTIVE_7,
+            pattern_map.SNAP_ACTIVE_8,
         )
 
         # Starts on SNAP 1/2 active, no secondary values set.
@@ -178,21 +207,18 @@ class SnapManager:
     def value(self) -> int:
         return self._value
 
+    def display_str(self) -> str:
+        """"S" in the second position and the snap number in the last,
+        e.g. " S 3"."""
+        return " S{:>2d}".format(self._value)
+
     def pattern(self, led_mode: LEDMode) -> Pattern:
-        """LED pattern for a SNAP group."""
+        """LED pattern for a SNAP group: the active snap's own pattern
+        for the active group, the shared passive pattern otherwise."""
         control_action = self._ACTION_BY_LED_MODE[led_mode]
-        secondary = self._secondary.get(control_action, False)
         if control_action == self.active_action:
-            return (
-                self.pattern_map.SNAP_ACTIVE_SEC
-                if secondary
-                else self.pattern_map.SNAP_ACTIVE
-            )
-        return (
-            self.pattern_map.SNAP_PASSIVE_SEC
-            if secondary
-            else self.pattern_map.SNAP_PASSIVE
-        )
+            return self._active_patterns[self._value - 1]
+        return self.pattern_map.SNAP_PASSIVE
 
 
 class PresetManager:
@@ -239,8 +265,9 @@ class PresetManager:
         return self._value
 
     def display_str(self) -> str:
-        """Formatted display string, e.g. "P  1"."""
-        return "P{:3d}".format(self._value)
+        """"P" in the second position and the preset number in the last,
+        e.g. " P 1" or " P12"."""
+        return " P{:>2d}".format(self._value)
 
 
 class LooperManager:
@@ -253,11 +280,20 @@ class LooperManager:
     _OVERDUBBING = 3
     _STOPPED = 4
 
+    # Four-character, 7-segment friendly labels.
+    _TXT_REC = "rEC "
+    _TXT_PLAY = "PLAY"
+    _TXT_OVERDUB = "OdUb"
+    _TXT_STOP = "StOP"
+    _TXT_CLEAR = "CLr "
+    _TXT_UNDO = "UndO"
+
     def __init__(self, midi_map: MidiMap, pattern_map: PatternMap):
         self.midi_map = midi_map
         self.pattern_map = pattern_map
         self.state = self._EMPTY
         self._msg_value = midi_map.LOOPER_UNDO_VAL
+        self._text = self._TXT_STOP
 
     def exec_action(self, control_action: ControlAction):
         """Advances the state machine. Retrieve the resulting message via
@@ -272,6 +308,12 @@ class LooperManager:
             elif self.state == self._OVERDUBBING:
                 self.state = self._PLAYING
             self._msg_value = self.midi_map.LOOPER_RO_VAL
+            if self.state == self._RECORDING:
+                self._text = self._TXT_REC
+            elif self.state == self._OVERDUBBING:
+                self._text = self._TXT_OVERDUB
+            else:
+                self._text = self._TXT_PLAY
 
         elif control_action == ControlAction.LOOPER_STOP_PLAY:
             if self.state in (
@@ -283,13 +325,18 @@ class LooperManager:
             elif self.state == self._STOPPED:
                 self.state = self._PLAYING
             self._msg_value = self.midi_map.LOOPER_SP_VAL
+            self._text = (
+                self._TXT_PLAY if self.state == self._PLAYING else self._TXT_STOP
+            )
 
         elif control_action == ControlAction.LOOPER_CLEAR:
             self.state = self._EMPTY
             self._msg_value = self.midi_map.LOOPER_CLEAR_VAL
+            self._text = self._TXT_CLEAR
 
         else:  # ControlAction.LOOPER_UNDO -- does not change the transport state.
             self._msg_value = self.midi_map.LOOPER_UNDO_VAL
+            self._text = self._TXT_UNDO
 
     def msg(self) -> ControlChange:
         return ControlChange(
@@ -297,6 +344,12 @@ class LooperManager:
             controller=self.midi_map.LOOPER_CC,
             value=self._msg_value,
         )
+
+    def display_str(self) -> str:
+        """Label for the latest loop command: "rEC ", "PLAY", "OdUb",
+        "StOP", "CLr " or "UndO". Shows the resulting state for record
+        and stop/play."""
+        return self._text
 
     def pattern(self) -> Pattern:
         if self.state == self._RECORDING:
@@ -348,36 +401,36 @@ class ValueManager:
 
     # Encoder acceleration: consecutive steps arriving within these
     # intervals get a larger multiplier applied to param.step.
-    _ACCEL_FAST_MS = 30
+    _ACCEL_FAST_MS = 40
     _ACCEL_FAST_MULT = 4
     _ACCEL_MED_MS = 80
     _ACCEL_MED_MULT = 2
 
-    def __init__(
-        self, midi_map: MidiMap, params: list[ValueParam], hang_ms: int = 1000
-    ):
+    def __init__(self, midi_map: MidiMap, params: list[ValueParam]):
         """
         Args:
             midi_map (MidiMap): MIDI channel configuration.
             params (list[ValueParam]): Value targets to cycle through.
-            hang_ms (int, optional): How long is_active() stays true after
-                a change. Defaults to 1000.
+
+        Raises:
+            ValueError: If params is empty.
         """
         if not params:
             raise ValueError("ValueManager needs at least one ValueParam")
         self.midi_map = midi_map
         self.params = params
-        self.hang_ms = hang_ms
         self._index = 0
-        self._last_change_ms = 0
         self._last_step_ms = 0
 
     def exec_action(self, control_action: ControlAction):
         """Selects the next target, or adjusts the current target's value.
         Retrieve the resulting message via msg()."""
-        if control_action == ControlAction.VALUE_TOGGLE:
+        if control_action == ControlAction.VALUE_DISP:
+            # do nothing
+            pass
+        elif control_action == ControlAction.VALUE_TOGGLE:
             self._index = (self._index + 1) % len(self.params)
-        else:
+        elif control_action in (ControlAction.VALUE_UP, ControlAction.VALUE_DOWN):
             param = self.params[self._index]
 
             now = time.ticks_ms()
@@ -396,7 +449,6 @@ class ValueManager:
             param.value = max(
                 param.min_value, min(param.max_value, param.value + delta)
             )
-        self._last_change_ms = time.ticks_ms()
 
     def msg(self) -> ControlChange:
         param = self.params[self._index]
@@ -407,10 +459,6 @@ class ValueManager:
             controller=param.cc,
             value=param.value,
         )
-
-    def is_active(self) -> bool:
-        """True if a value changed recently."""
-        return time.ticks_diff(time.ticks_ms(), self._last_change_ms) < self.hang_ms
 
     def display_str(self) -> str:
         """Formatted display string, e.g. "V068"."""
