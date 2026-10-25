@@ -90,7 +90,7 @@ VALUE_PARAMS = [
 ]
 
 # How long (ms) a command message stays on the display
-DISPLAY_HANG_MS = 1000
+DISPLAY_HANG_MS = 500
 
 controls = []
 for i in range(4):
