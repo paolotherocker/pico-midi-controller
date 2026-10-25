@@ -65,16 +65,16 @@ PATTERN_MAP = PatternMap(
 CONTROLS_MAP = [
     [ControlAction.NONE, ControlAction.SNAP_1_2, ControlAction.PRESET_DOWN],
     [ControlAction.NONE, ControlAction.SNAP_3_4, ControlAction.PRESET_UP],
-    [ControlAction.LOOPER_STOP_PLAY, ControlAction.NONE, ControlAction.LOOPER_CLEAR],
-    [ControlAction.LOOPER_REC_OD, ControlAction.NONE, ControlAction.NONE],
+    [ControlAction.NONE, ControlAction.SNAP_5_6, ControlAction.NONE],
+    [ControlAction.NONE, ControlAction.SNAP_7_8, ControlAction.NONE],
 ]
 
 # LED mode for each NeoPixel group, in order
 LED_MAP = [
     LEDMode.SNAP_1_2,
     LEDMode.SNAP_3_4,
-    LEDMode.LOOPER,
-    LEDMode.LOOPER,
+    LEDMode.SNAP_5_6,
+    LEDMode.SNAP_7_8,
 ]
 
 # Send a mode message every time a snap message is sent
