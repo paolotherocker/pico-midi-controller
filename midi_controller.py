@@ -1,6 +1,7 @@
 """Top-level MidiController: polls control hardware, drives the SNAP,
-preset, looper, and value managers, sends the resulting MIDI messages
-over USB, and refreshes the NeoPixel array and display accordingly.
+preset, looper, stomp, and value managers, sends the resulting MIDI
+messages over USB, and refreshes the NeoPixel array and display
+accordingly.
 """
 
 import time
@@ -22,6 +23,7 @@ from managers import (
     SnapManager,
     PresetManager,
     LooperManager,
+    StompManager,
     ValueParam,
     ValueManager,
 )
@@ -50,6 +52,13 @@ class MidiController:
         ControlAction.LOOPER_STOP_PLAY,
         ControlAction.LOOPER_UNDO,
         ControlAction.LOOPER_CLEAR,
+    )
+
+    _STOMP_ACTIONS = (
+        ControlAction.STOMP_1,
+        ControlAction.STOMP_2,
+        ControlAction.STOMP_3,
+        ControlAction.STOMP_4,
     )
 
     _VALUE_ACTIONS = (
@@ -128,6 +137,7 @@ class MidiController:
         self.snap = SnapManager(midi_map=midi_map, pattern_map=pattern_map)
         self.preset = PresetManager(midi_map=midi_map, preset_num=preset_num)
         self.looper = LooperManager(midi_map=midi_map, pattern_map=pattern_map)
+        self.stomp = StompManager(midi_map=midi_map, pattern_map=pattern_map)
 
         # Message for the latest command and when it was posted. A new
         # command replaces it and restarts the timeout.
@@ -197,6 +207,11 @@ class MidiController:
                 if param.min_value > param.max_value:
                     self._fail(ConfigError.VALUE_RANGE)
 
+        # Each assigned stomp action needs a CC in the MidiMap
+        for action in self._STOMP_ACTIONS:
+            if action in configured and self.stomp.cc(action) is None:
+                self._fail(ConfigError.STOMP_UNCONFIGURED)
+
     def _post_message(self, text: str):
         """Replaces the display message and restarts its timeout."""
         self._message = text
@@ -226,6 +241,11 @@ class MidiController:
             self._post_message(self.looper.display_str())
             self.msg_queue.append(self.looper.msg())
 
+        elif action in self._STOMP_ACTIONS:
+            self.stomp.exec_action(action)
+            self._post_message(self.stomp.display_str())
+            self.msg_queue.append(self.stomp.msg())
+
         elif action in self._VALUE_ACTIONS:
             if self.value:
                 self.value.exec_action(action)
@@ -244,6 +264,8 @@ class MidiController:
             pattern = None
             if led_mode in SnapManager._ACTION_BY_LED_MODE:
                 pattern = self.snap.pattern(led_mode)
+            elif led_mode in StompManager._ACTION_BY_LED_MODE:
+                pattern = self.stomp.pattern(led_mode)
             elif led_mode == LEDMode.LOOPER:
                 pattern = self.looper.pattern()
 

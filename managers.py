@@ -1,5 +1,5 @@
 """State managers for the MIDI controller: SNAP groups, presets, the
-looper transport, and value targets. Also holds their shared
+looper transport, stomps, and value targets. Also holds their shared
 configuration types (MidiMap, PatternMap, ValueParam) and the
 ConfigError codes surfaced by MidiController.
 """
@@ -32,9 +32,13 @@ class ConfigError:
     VALUE_RANGE = 2
     VALUE_UNCONFIGURED = 3
     QUEUE_OVERFLOW = 4
+    STOMP_UNCONFIGURED = 5
 
 
 class MidiMap:
+    """MIDI channel, CC numbers and message values. The stomp CCs are
+    optional and default to None (unassigned)."""
+
     CHANNEL: int
     SNAP_CC: int
     SNAP_MODE_VAL: int
@@ -47,6 +51,10 @@ class MidiMap:
     LOOPER_SP_VAL: int
     LOOPER_UNDO_VAL: int
     LOOPER_CLEAR_VAL: int
+    STOMP_1_CC: int
+    STOMP_2_CC: int
+    STOMP_3_CC: int
+    STOMP_4_CC: int
 
     def __init__(
         self,
@@ -62,6 +70,10 @@ class MidiMap:
         looper_sp_val: int,
         looper_undo_val: int,
         looper_clear_val: int,
+        stomp_1_cc: int = None,
+        stomp_2_cc: int = None,
+        stomp_3_cc: int = None,
+        stomp_4_cc: int = None,
     ):
         self.CHANNEL = _clamp_channel(channel)
         self.SNAP_CC = _clamp_byte(snap_cc)
@@ -75,12 +87,16 @@ class MidiMap:
         self.LOOPER_SP_VAL = _clamp_byte(looper_sp_val)
         self.LOOPER_UNDO_VAL = _clamp_byte(looper_undo_val)
         self.LOOPER_CLEAR_VAL = _clamp_byte(looper_clear_val)
+        self.STOMP_1_CC = _clamp_byte(stomp_1_cc)
+        self.STOMP_2_CC = _clamp_byte(stomp_2_cc)
+        self.STOMP_3_CC = _clamp_byte(stomp_3_cc)
+        self.STOMP_4_CC = _clamp_byte(stomp_4_cc)
 
 
 class PatternMap:
     """NeoPixel patterns for each LED state. Unset patterns stay off.
     Each snap (1-8) has its own active pattern; passive groups share
-    one pattern."""
+    one pattern. Each stomp (1-4) has a pattern for when it is on."""
 
     SNAP_ACTIVE_1: Pattern
     SNAP_ACTIVE_2: Pattern
@@ -96,6 +112,10 @@ class PatternMap:
     LOOPER_PLAYING: Pattern
     LOOPER_OVERDUBBING: Pattern
     LOOPER_STOPPED: Pattern
+    STOMP_1: Pattern
+    STOMP_2: Pattern
+    STOMP_3: Pattern
+    STOMP_4: Pattern
 
     def __init__(
         self,
@@ -113,6 +133,10 @@ class PatternMap:
         looper_playing: Pattern = Off(),
         looper_overdubbing: Pattern = Off(),
         looper_stopped: Pattern = Off(),
+        stomp_1: Pattern = Off(),
+        stomp_2: Pattern = Off(),
+        stomp_3: Pattern = Off(),
+        stomp_4: Pattern = Off(),
     ):
         self.SNAP_ACTIVE_1 = snap_active_1
         self.SNAP_ACTIVE_2 = snap_active_2
@@ -128,6 +152,10 @@ class PatternMap:
         self.LOOPER_PLAYING = looper_playing
         self.LOOPER_OVERDUBBING = looper_overdubbing
         self.LOOPER_STOPPED = looper_stopped
+        self.STOMP_1 = stomp_1
+        self.STOMP_2 = stomp_2
+        self.STOMP_3 = stomp_3
+        self.STOMP_4 = stomp_4
 
 
 class SnapManager:
@@ -361,6 +389,113 @@ class LooperManager:
         if self.state == self._STOPPED:
             return self.pattern_map.LOOPER_STOPPED
         return self.pattern_map.LOOPER_EMPTY
+
+
+class StompManager:
+    """Four independent on/off stomps. Each press toggles one stomp and
+    sends its state as a CC value (127 on, 0 off)."""
+
+    ON_VALUE = 127
+    OFF_VALUE = 0
+
+    _ACTIONS = (
+        ControlAction.STOMP_1,
+        ControlAction.STOMP_2,
+        ControlAction.STOMP_3,
+        ControlAction.STOMP_4,
+    )
+
+    _ACTION_BY_LED_MODE = {
+        LEDMode.STOMP_1: ControlAction.STOMP_1,
+        LEDMode.STOMP_2: ControlAction.STOMP_2,
+        LEDMode.STOMP_3: ControlAction.STOMP_3,
+        LEDMode.STOMP_4: ControlAction.STOMP_4,
+    }
+
+    # Shared instance so MidiController's identity check sees no change
+    # between consecutive inactive frames.
+    _OFF = Off()
+
+    def __init__(self, midi_map: MidiMap, pattern_map: PatternMap):
+        self.midi_map = midi_map
+        self.pattern_map = pattern_map
+
+        self._ccs = (
+            midi_map.STOMP_1_CC,
+            midi_map.STOMP_2_CC,
+            midi_map.STOMP_3_CC,
+            midi_map.STOMP_4_CC,
+        )
+        self._active_patterns = (
+            pattern_map.STOMP_1,
+            pattern_map.STOMP_2,
+            pattern_map.STOMP_3,
+            pattern_map.STOMP_4,
+        )
+        self._states = [False, False, False, False]
+        self._last = 0
+
+    def _index(self, control_action: ControlAction) -> int:
+        index = control_action - ControlAction.STOMP_1
+        if not 0 <= index < len(self._ACTIONS):
+            raise ValueError("not a stomp action: {!r}".format(control_action))
+        return index
+
+    def exec_action(self, control_action: ControlAction):
+        """Toggles a stomp. Retrieve the resulting message via msg().
+
+        Raises:
+            ValueError: If control_action is not a stomp action.
+        """
+        index = self._index(control_action)
+        self._states[index] = not self._states[index]
+        self._last = index
+
+    def cc(self, control_action: ControlAction) -> int:
+        """CC number assigned to a stomp, or None if unassigned.
+
+        Raises:
+            ValueError: If control_action is not a stomp action.
+        """
+        return self._ccs[self._index(control_action)]
+
+    def is_on(self, control_action: ControlAction) -> bool:
+        """True if the stomp is on.
+
+        Raises:
+            ValueError: If control_action is not a stomp action.
+        """
+        return self._states[self._index(control_action)]
+
+    def msg(self) -> ControlChange:
+        """CC message for the most recently toggled stomp.
+
+        Raises:
+            ValueError: If that stomp has no CC assigned.
+        """
+        cc = self._ccs[self._last]
+        if cc is None:
+            raise ValueError("stomp {} has no CC assigned".format(self._last + 1))
+        return ControlChange(
+            channel=self.midi_map.CHANNEL,
+            controller=cc,
+            value=self.ON_VALUE if self._states[self._last] else self.OFF_VALUE,
+        )
+
+    def display_str(self) -> str:
+        """Stomp number and state of the latest toggle, e.g. "t1On" or
+        "t3OF"."""
+        return "t{}{}".format(
+            self._last + 1, "On" if self._states[self._last] else "OF"
+        )
+
+    def pattern(self, led_mode: LEDMode) -> Pattern:
+        """LED pattern for a stomp: its own pattern while on, off
+        otherwise."""
+        index = self._index(self._ACTION_BY_LED_MODE[led_mode])
+        if self._states[index]:
+            return self._active_patterns[index]
+        return self._OFF
 
 
 class ValueParam:

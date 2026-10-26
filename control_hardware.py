@@ -20,6 +20,10 @@ class ControlAction:
     VALUE_DOWN = 12
     VALUE_TOGGLE = 13
     VALUE_DISP = 14
+    STOMP_1 = 15
+    STOMP_2 = 16
+    STOMP_3 = 17
+    STOMP_4 = 18
 
 
 class LEDMode:
@@ -31,6 +35,10 @@ class LEDMode:
     SNAP_5_6 = 3
     SNAP_7_8 = 4
     LOOPER = 5
+    STOMP_1 = 6
+    STOMP_2 = 7
+    STOMP_3 = 8
+    STOMP_4 = 9
 
 
 class Control:

@@ -21,7 +21,7 @@ Pin numbers, group sizes and the USB product name are constants at the top of `m
 | `main.py` | Pin assignments, MIDI map, LED patterns, switch assignments and the main loop. This is the file you edit to configure the controller. |
 | `midi_controller.py` | `MidiController`: polls the controls, dispatches actions, queues and sends MIDI, refreshes LEDs and display. |
 | `control_hardware.py` | `ControlAction`, `LEDMode`, `ControlButton` and `ControlEncoder`. |
-| `managers.py` | State for SNAP groups, presets, looper and value targets, plus `MidiMap`, `PatternMap`, `ValueParam` and `ConfigError`. |
+| `managers.py` | State for SNAP groups, presets, looper, stomps and value targets, plus `MidiMap`, `PatternMap`, `ValueParam` and `ConfigError`. |
 | `hardware_test.py` | Standalone self-test for every input, the display, the NeoPixels and USB MIDI. |
 
 ## Dependencies
@@ -77,7 +77,7 @@ Slots are independent and can be combined, so note what a single gesture trigger
 
 - A short tap fires `action_pressed`, then `action_short` on release.
 - A long hold fires `action_pressed`, then `action_long` at the threshold. `action_short` is not fired, and nothing further happens on release.
-- If the same action is assigned to both `action_pressed` and `action_short`, a tap runs it twice.
+- If the same action is assigned to both `action_pressed` and `action_short`, a tap runs it twice. For a toggling action such as a stomp, that cancels itself out.
 
 The underlying `Button` driver also reports a long release event, but `ControlButton` does not currently map it to an action.
 
@@ -110,6 +110,7 @@ All commands are `ControlAction` members. Message values come from the `MidiMap`
 | `LOOPER_STOP_PLAY` | Stops while recording, playing or overdubbing; plays when stopped. | CC 25, value 2. | `PLAY` or `StOP` |
 | `LOOPER_CLEAR` | Clears the loop and returns to empty. | CC 25, value 3. | `CLr ` |
 | `LOOPER_UNDO` | Sends undo; the transport state is unchanged. | CC 25, value 4. | `UndO` |
+| `STOMP_1` to `STOMP_4` | Toggles the stomp on or off. | CC 26 to 29 for stomps 1 to 4, value 127 (on) or 0 (off). | `t1On`, `t1OF` and so on |
 | `VALUE_UP` | Raises the selected value target by its step. | CC `cc` of the target, new value. | e.g. `V101` |
 | `VALUE_DOWN` | Lowers the selected value target by its step. | CC `cc` of the target, new value. | e.g. `V099` |
 | `VALUE_TOGGLE` | Selects the next value target, wrapping round. | CC of the new target, its current value. | e.g. `A  0` |
@@ -121,11 +122,17 @@ The four SNAP groups map to eight snapshots. Pressing a group selects its first 
 
 ### Presets
 
-The controller counts presets from 1 to `preset_num` (default 8). Any preset command also resets SNAP to group 1/2, snapshot 1, and sends that SNAP value straight after the preset message, so a new preset never inherits the previous SNAP state. Presets are stepped, not selected directly, so the host is expected to follow the up and down messages.
+The controller counts presets from 1 to `preset_num` (default 8). Any preset command also resets SNAP to group 1/2, snapshot 1, and sends that SNAP value straight after the preset message, so a new preset never inherits the previous SNAP state. Presets are stepped, not selected directly, so the host is expected to follow the up and down messages. Stomp states are not changed by presets.
 
 ### Looper
 
 The looper is a five-state machine: empty, recording, playing, overdubbing, stopped. The controller only tracks the state for the LEDs and display. The recording itself happens in the receiving device, which should respond to CC 25.
+
+### Stomps
+
+There are four independent stomps, each with its own `ControlAction` (`STOMP_1` to `STOMP_4`) and CC (`stomp_1_cc` to `stomp_4_cc` in the `MidiMap`). All stomps start off. Each press toggles that stomp and sends its CC with value 127 when on or 0 when off. The controller does not read the state back from the host, so it can drift if the host changes the stomp itself.
+
+A stomp action needs its CC set in the `MidiMap`; otherwise start-up fails with `E005`. A NeoPixel group with a `STOMP_n` LED mode shows the `stomp_n` pattern while the stomp is on and is blank while it is off.
 
 ### Value targets
 
@@ -170,6 +177,14 @@ Zero-latency SNAP selection. The action runs on press, and nothing is assigned t
 ControlButton(pin=8, action_pressed=ControlAction.SNAP_3_4)
 ```
 
+A stomp on a foot switch, with its own NeoPixel group lit while it is on:
+
+```python
+ControlButton(pin=6, action_pressed=ControlAction.STOMP_1)
+
+LED_MAP = [LEDMode.STOMP_1, LEDMode.SNAP_7_8, LEDMode.SNAP_3_4, LEDMode.SNAP_1_2]
+```
+
 Encoder stepping presets instead of values:
 
 ```python
@@ -192,9 +207,9 @@ VALUE_PARAMS = [
 
 ## Configuration
 
-- `MidiMap` sets the channel and the CC numbers and values for SNAP, preset and looper messages. Values are clamped to 0 to 127 and the channel to 0 to 15.
-- `PatternMap` sets a NeoPixel pattern for each of the eight active SNAP states, the shared passive SNAP state and the five looper states. Unset patterns stay off. Patterns (`Solid`, `Off`, `Pulse`, `Flash`, `Wave`) come from `utils.neopixelmanager`.
-- `LED_MAP` lists one `LEDMode` per NeoPixel group, in order: `SNAP_1_2`, `SNAP_3_4`, `SNAP_5_6`, `SNAP_7_8` or `LOOPER`. A group is only repainted when its pattern changes, so animations are not restarted every frame.
+- `MidiMap` sets the channel and the CC numbers and values for SNAP, preset and looper messages, plus the optional `stomp_1_cc` to `stomp_4_cc`. Values are clamped to 0 to 127 and the channel to 0 to 15. Unset stomp CCs are `None`.
+- `PatternMap` sets a NeoPixel pattern for each of the eight active SNAP states, the shared passive SNAP state, the five looper states and the four stomp-on states (`stomp_1` to `stomp_4`). Unset patterns stay off. Patterns (`Solid`, `Off`, `Pulse`, `Flash`, `Wave`) come from `utils.neopixelmanager`.
+- `LED_MAP` lists one `LEDMode` per NeoPixel group, in order: `SNAP_1_2`, `SNAP_3_4`, `SNAP_5_6`, `SNAP_7_8`, `LOOPER`, or `STOMP_1` to `STOMP_4`. A group is only repainted when its pattern changes, so animations are not restarted every frame.
 - `display_hang_ms` sets how long each command message stays on the display. The display is blank otherwise.
 
 Outgoing messages are queued (256 entries) and sent one every 8 ms.
@@ -209,3 +224,4 @@ If the configuration is invalid, all LEDs are turned off, the display shows the 
 | `E002` | A `ValueParam` has `min_value` greater than `max_value`. |
 | `E003` | A value command is assigned but no `value_params` were given. |
 | `E004` | The MIDI message queue overflowed. |
+| `E005` | A stomp command is assigned but its CC is not set in the `MidiMap`. |

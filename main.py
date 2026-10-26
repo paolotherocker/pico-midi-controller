@@ -48,6 +48,10 @@ MIDI_MAP = MidiMap(
     looper_sp_val=2,
     looper_clear_val=3,
     looper_undo_val=4,
+    stomp_1_cc=26,
+    stomp_2_cc=27,
+    stomp_3_cc=28,
+    stomp_4_cc=29,
 )
 
 PATTERN_MAP = PatternMap(
@@ -65,6 +69,10 @@ PATTERN_MAP = PatternMap(
     looper_playing=Wave((3, 3, 0), (30, 30, 0), period_ms=2000, spread=1),  # Yellow
     looper_recording=Wave((6, 0, 0), (60, 0, 0), period_ms=2000, spread=1),  # Red
     looper_overdubbing=Wave((6, 0, 0), (60, 0, 0), period_ms=2000, spread=1),  # Red
+    stomp_1=Solid((0, 50, 0)),  # Green
+    stomp_2=Solid((50, 25, 0)),  # Amber
+    stomp_3=Solid((0, 40, 40)),  # Cyan
+    stomp_4=Solid((40, 0, 40)),  # Magenta
 )
 
 CONTROLS_MAP = [
