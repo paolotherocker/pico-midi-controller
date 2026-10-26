@@ -100,17 +100,17 @@ All commands are `ControlAction` members. Message values come from the `MidiMap`
 | Command | Effect | MIDI sent (default) | Display |
 | --- | --- | --- | --- |
 | `NONE` | Does nothing. | None. | None. |
-| `SNAP_1_2` | Selects SNAP group 1/2. | CC 24, value 1 or 2. | ` S 1` or ` S 2` |
-| `SNAP_3_4` | Selects SNAP group 3/4. | CC 24, value 3 or 4. | ` S 3` or ` S 4` |
-| `SNAP_5_6` | Selects SNAP group 5/6. | CC 24, value 5 or 6. | ` S 5` or ` S 6` |
-| `SNAP_7_8` | Selects SNAP group 7/8. | CC 24, value 7 or 8. | ` S 7` or ` S 8` |
+| `SNAP_1_2` | Selects SNAP group 1/2. | CC 24, value 1 or 2. | `Sn 1` or `Sn 2` |
+| `SNAP_3_4` | Selects SNAP group 3/4. | CC 24, value 3 or 4. | `Sn 3` or `Sn 4` |
+| `SNAP_5_6` | Selects SNAP group 5/6. | CC 24, value 5 or 6. | `Sn 5` or `Sn 6` |
+| `SNAP_7_8` | Selects SNAP group 7/8. | CC 24, value 7 or 8. | `Sn 7` or `Sn 8` |
 | `PRESET_UP` | Next preset, wrapping from the last to 1. | CC 20, value 1, then CC 24, value 1. | ` P n` |
 | `PRESET_DOWN` | Previous preset, wrapping from 1 to the last. | CC 20, value 2, then CC 24, value 1. | ` P n` |
 | `LOOPER_REC_OD` | Record, then play, then overdub, toggling between play and overdub. | CC 25, value 1. | `rEC `, `PLAY` or `OdUb` |
 | `LOOPER_STOP_PLAY` | Stops while recording, playing or overdubbing; plays when stopped. | CC 25, value 2. | `PLAY` or `StOP` |
 | `LOOPER_CLEAR` | Clears the loop and returns to empty. | CC 25, value 3. | `CLr ` |
 | `LOOPER_UNDO` | Sends undo; the transport state is unchanged. | CC 25, value 4. | `UndO` |
-| `STOMP_1` to `STOMP_4` | Toggles the stomp on or off. | CC 26 to 29 for stomps 1 to 4, value 127 (on) or 0 (off). | `t1On`, `t1OF` and so on |
+| `STOMP_1` to `STOMP_4` | Toggles the stomp on or off. | CC 26 to 29 for stomps 1 to 4, value 127 (on) or 0 (off). | `t1 1` (on) or `t1 0` (off), with the stomp number in place of 1 |
 | `VALUE_UP` | Raises the selected value target by its step. | CC `cc` of the target, new value. | e.g. `V101` |
 | `VALUE_DOWN` | Lowers the selected value target by its step. | CC `cc` of the target, new value. | e.g. `V099` |
 | `VALUE_TOGGLE` | Selects the next value target, wrapping round. | CC of the new target, its current value. | e.g. `A  0` |

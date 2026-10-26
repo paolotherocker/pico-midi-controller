@@ -236,9 +236,8 @@ class SnapManager:
         return self._value
 
     def display_str(self) -> str:
-        """"S" in the second position and the snap number in the last,
-        e.g. " S 3"."""
-        return " S{:>2d}".format(self._value)
+        """"Sn" followed by a space and the snap number, e.g. "Sn 3"."""
+        return "Sn {}".format(self._value)
 
     def pattern(self, led_mode: LEDMode) -> Pattern:
         """LED pattern for a SNAP group: the active snap's own pattern
@@ -483,11 +482,9 @@ class StompManager:
         )
 
     def display_str(self) -> str:
-        """Stomp number and state of the latest toggle, e.g. "t1On" or
-        "t3OF"."""
-        return "t{}{}".format(
-            self._last + 1, "On" if self._states[self._last] else "OF"
-        )
+        """"t", the stomp number, a space and the state (1 on, 0 off),
+        e.g. "t2 1"."""
+        return "t{} {}".format(self._last + 1, int(self._states[self._last]))
 
     def pattern(self, led_mode: LEDMode) -> Pattern:
         """LED pattern for a stomp: its own pattern while on, off
