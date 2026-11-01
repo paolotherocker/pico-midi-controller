@@ -34,11 +34,16 @@ MIDI_INTERVAL_MS = 8
 class MidiController:
     """Generates MIDI messages from control hardware, sends them over
     USB, and refreshes the LEDs and display. The display is blank except
-    for a short message after each command."""
+    for a short message after each command. The current snap is sent
+    shortly after the USB MIDI connection opens."""
 
     _MSG_QUEUE_MAXLEN = 256
 
     _BLANK = "    "
+
+    # Delay between the USB connection opening and the current snap being
+    # sent, so the host application can attach to the port first.
+    _USB_SYNC_DELAY_MS = 500
 
     _SNAP_ACTIONS = (
         ControlAction.SNAP_1_2,
@@ -165,6 +170,12 @@ class MidiController:
         self.msg_queue = deque((), self._MSG_QUEUE_MAXLEN)
         self.msg_time: int = 0
 
+        # USB connection tracking: the snap is queued once the connection
+        # has been open for _USB_SYNC_DELAY_MS.
+        self._usb_was_open: bool = False
+        self._usb_open_ms: int = 0
+        self._snap_sync_pending: bool = False
+
         self.display.brightness(3)
         self.display.show(self._BLANK)
 
@@ -227,6 +238,13 @@ class MidiController:
         self._message = text
         self._message_ms = time.ticks_ms()
 
+    def _queue_snap(self):
+        """Queues the current snap message, preceded by the mode message
+        when send_mode_msg is set."""
+        if self.send_mode_msg == True:
+            self.msg_queue.append(self.snap.snap_mode_msg())
+        self.msg_queue.append(self.snap.msg())
+
     def _handle_action(self, action: ControlAction):
         """Handles a single action."""
         if action == ControlAction.NONE:
@@ -235,9 +253,7 @@ class MidiController:
         if action in self._SNAP_ACTIONS:
             self.snap.exec_action(action)
             self._post_message(self.snap.display_str())
-            if self.send_mode_msg == True:
-                self.msg_queue.append(self.snap.snap_mode_msg())
-            self.msg_queue.append(self.snap.msg())
+            self._queue_snap()
 
         elif action in (ControlAction.PRESET_UP, ControlAction.PRESET_DOWN):
             self.preset.exec_action(action)
@@ -288,9 +304,7 @@ class MidiController:
         display_hang_ms."""
         if self._message is None:
             return False
-        return (
-            time.ticks_diff(time.ticks_ms(), self._message_ms) < self.display_hang_ms
-        )
+        return time.ticks_diff(time.ticks_ms(), self._message_ms) < self.display_hang_ms
 
     def _refresh_display(self):
         """Shows the current message while active, and blanks the
@@ -309,9 +323,33 @@ class MidiController:
         elif self.midi_usb.is_open():
             self.midi_usb.send_message(msg)
 
+    def _sync_usb_state(self, now: int):
+        """Queues the current snap once the connection has been open for
+        _USB_SYNC_DELAY_MS, and cancels if it closes first. Without a USB
+        interface, the connection counts as open from the first update."""
+        is_open = self.midi_usb is None or self.midi_usb.is_open()
+
+        if is_open and not self._usb_was_open:
+            self._usb_open_ms = now
+            self._snap_sync_pending = True
+        elif not is_open:
+            self._snap_sync_pending = False
+        self._usb_was_open = is_open
+
+        if (
+            self._snap_sync_pending
+            and time.ticks_diff(now, self._usb_open_ms) >= self._USB_SYNC_DELAY_MS
+        ):
+            self._snap_sync_pending = False
+            self._queue_snap()
+
     def update(self):
         """Polls the hardware once and refreshes the LEDs, display and
-        MIDI output. Call every few milliseconds from the main loop."""
+        MIDI output. Call every few milliseconds from the main loop.
+        Sends the current snap shortly after the USB connection opens."""
+        now = time.ticks_ms()
+        self._sync_usb_state(now)
+
         for ctrl in self._hardware:
             self._handle_action(ctrl.update())
 
@@ -321,7 +359,6 @@ class MidiController:
         self.np.update()
         self.np.write()
 
-        now = time.ticks_ms()
         if time.ticks_diff(now, self.msg_time) > MIDI_INTERVAL_MS:
             if len(self.msg_queue) > 0:
                 self.msg_time = now
