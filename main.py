@@ -93,6 +93,9 @@ LED_MAP = [
 # Send a mode message every time a snap message is sent
 SEND_MODE_MSG = True
 
+# Snap (1-8) active at start-up and after every preset change
+DEFAULT_SNAP = 5
+
 # Rotary encoder value targets
 VALUE_PARAMS = [
     ValueParam(
@@ -159,6 +162,7 @@ midi_controller = MidiController(
     control_encoder=control_encoder,
     value_params=VALUE_PARAMS,
     display_hang_ms=DISPLAY_HANG_MS,
+    default_snap=DEFAULT_SNAP,
 )
 
 while True:

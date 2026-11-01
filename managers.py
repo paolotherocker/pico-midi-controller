@@ -33,6 +33,7 @@ class ConfigError:
     VALUE_UNCONFIGURED = 3
     QUEUE_OVERFLOW = 4
     STOMP_UNCONFIGURED = 5
+    SNAP_DEFAULT = 6
 
 
 class MidiMap:
@@ -170,6 +171,14 @@ class SnapManager:
         ControlAction.SNAP_7_8: 7,
     }
 
+    # Group actions in ascending snap order; group index = (snap - 1) // 2.
+    _GROUP_ACTIONS = (
+        ControlAction.SNAP_1_2,
+        ControlAction.SNAP_3_4,
+        ControlAction.SNAP_5_6,
+        ControlAction.SNAP_7_8,
+    )
+
     _ACTION_BY_LED_MODE = {
         LEDMode.SNAP_1_2: ControlAction.SNAP_1_2,
         LEDMode.SNAP_3_4: ControlAction.SNAP_3_4,
@@ -177,9 +186,25 @@ class SnapManager:
         LEDMode.SNAP_7_8: ControlAction.SNAP_7_8,
     }
 
-    def __init__(self, midi_map: MidiMap, pattern_map: PatternMap):
+    def __init__(
+        self, midi_map: MidiMap, pattern_map: PatternMap, default_snap: int = 1
+    ):
+        """
+        Args:
+            midi_map (MidiMap): MIDI channel and CC configuration.
+            pattern_map (PatternMap): LED patterns to use.
+            default_snap (int, optional): Snap (1-8) selected at start-up
+                and by reset(). Defaults to 1.
+
+        Raises:
+            ValueError: If default_snap is not an integer from 1 to 8.
+        """
+        if not isinstance(default_snap, int) or not 1 <= default_snap <= 8:
+            raise ValueError("default_snap must be 1-8: {!r}".format(default_snap))
+
         self.midi_map = midi_map
         self.pattern_map = pattern_map
+        self._default_snap = default_snap
 
         self._snap_mode_msg = ControlChange(
             channel=midi_map.CHANNEL,
@@ -199,17 +224,18 @@ class SnapManager:
             pattern_map.SNAP_ACTIVE_8,
         )
 
-        # Starts on SNAP 1/2 active, no secondary values set.
+        # Starts on the default snap, no other secondary values set.
         self.reset()
 
     def reset(self):
-        """Clears every group's secondary value and reactivates SNAP 1/2,
-        the default group. Called on start-up and whenever a preset
-        command is received, since a preset shouldn't inherit whatever
-        SNAP state was active on the previous preset."""
-        self._secondary = {}
-        self.active_action = ControlAction.SNAP_1_2
-        self._value = self._BASE_VALUE[ControlAction.SNAP_1_2]
+        """Clears every group's secondary value and reselects the default
+        snap. Called on start-up and whenever a preset command is
+        received, since a preset shouldn't inherit whatever SNAP state
+        was active on the previous preset."""
+        action = self._GROUP_ACTIONS[(self._default_snap - 1) // 2]
+        self._secondary = {action: self._default_snap % 2 == 0}
+        self.active_action = action
+        self._value = self._default_snap
 
     def exec_action(self, control_action: ControlAction):
         """Updates state for a SNAP press. Retrieve the resulting message

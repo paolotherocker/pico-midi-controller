@@ -82,6 +82,7 @@ class MidiController:
         control_encoder: ControlEncoder = None,
         value_params: list[ValueParam] = None,
         display_hang_ms: int = 1000,
+        default_snap: int = 1,
     ):
         """
         Args:
@@ -106,6 +107,8 @@ class MidiController:
             display_hang_ms (int, optional): How long the message for a
                 command stays on the display, in milliseconds. Defaults
                 to 1000.
+            default_snap (int, optional): Snap (1-8) active at start-up
+                and after every preset change. Defaults to 1.
 
         Raises:
             RuntimeError: If the configuration is invalid, or the message
@@ -134,7 +137,14 @@ class MidiController:
         )
 
         # Manager instances
-        self.snap = SnapManager(midi_map=midi_map, pattern_map=pattern_map)
+        try:
+            self.snap = SnapManager(
+                midi_map=midi_map,
+                pattern_map=pattern_map,
+                default_snap=default_snap,
+            )
+        except ValueError:
+            self._fail(ConfigError.SNAP_DEFAULT)
         self.preset = PresetManager(midi_map=midi_map, preset_num=preset_num)
         self.looper = LooperManager(midi_map=midi_map, pattern_map=pattern_map)
         self.stomp = StompManager(midi_map=midi_map, pattern_map=pattern_map)
