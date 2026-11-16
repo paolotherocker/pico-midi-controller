@@ -34,8 +34,9 @@ MIDI_INTERVAL_MS = 8
 class MidiController:
     """Generates MIDI messages from control hardware, sends them over
     USB, and refreshes the LEDs and display. The display is blank except
-    for a short message after each command. The current snap is sent
-    shortly after the USB MIDI connection opens."""
+    for a short message after each command. The current snap is sent,
+    and shown on the display, shortly after the USB MIDI connection
+    opens."""
 
     _MSG_QUEUE_MAXLEN = 256
 
@@ -329,9 +330,10 @@ class MidiController:
             self.midi_usb.send_message(msg)
 
     def _sync_usb_state(self, now: int):
-        """Queues the current snap once the connection has been open for
-        _USB_SYNC_DELAY_MS, and cancels if it closes first. Without a USB
-        interface, the connection counts as open from the first update."""
+        """Queues the current snap and shows it on the display once the
+        connection has been open for _USB_SYNC_DELAY_MS, and cancels if
+        it closes first. Without a USB interface, the connection counts
+        as open from the first update."""
         is_open = self.midi_usb is None or self.midi_usb.is_open()
 
         if is_open and not self._usb_was_open:
@@ -346,12 +348,14 @@ class MidiController:
             and time.ticks_diff(now, self._usb_open_ms) >= self._USB_SYNC_DELAY_MS
         ):
             self._snap_sync_pending = False
+            self._post_message(self.snap.display_str())
             self._queue_snap()
 
     def update(self):
         """Polls the hardware once and refreshes the LEDs, display and
         MIDI output. Call every few milliseconds from the main loop.
-        Sends the current snap shortly after the USB connection opens."""
+        Sends the current snap, and shows it on the display, shortly
+        after the USB connection opens."""
         now = time.ticks_ms()
         self._sync_usb_state(now)
 
