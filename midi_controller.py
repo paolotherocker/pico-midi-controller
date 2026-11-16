@@ -228,10 +228,15 @@ class MidiController:
                 if param.min_value > param.max_value:
                     self._fail(ConfigError.VALUE_RANGE)
 
-        # Each assigned stomp action needs a CC in the MidiMap
+        # Each assigned stomp action needs on and off messages in the MidiMap
         for action in self._STOMP_ACTIONS:
-            if action in configured and self.stomp.cc(action) is None:
+            if action in configured and not self.stomp.is_assigned(action):
                 self._fail(ConfigError.STOMP_UNCONFIGURED)
+
+        # Each assigned looper action needs its message in the MidiMap
+        for action in self._LOOPER_ACTIONS:
+            if action in configured and not self.looper.is_assigned(action):
+                self._fail(ConfigError.LOOPER_UNCONFIGURED)
 
     def _post_message(self, text: str):
         """Replaces the display message and restarts its timeout."""

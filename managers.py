@@ -6,7 +6,7 @@ ConfigError codes surfaced by MidiController.
 
 import time
 from utils.neopixelmanager import Pattern, Off
-from utils.midi import ControlChange
+from utils.midi import Message, ControlChange
 from control_hardware import ControlAction, LEDMode
 
 
@@ -24,6 +24,28 @@ def _clamp_channel(value: int) -> int:
     return max(0, min(15, value))
 
 
+def _check_message(msg: Message, name: str) -> Message:
+    """Return msg if it is a Message instance.
+
+    Raises:
+        TypeError: If msg is not a Message.
+    """
+    if not isinstance(msg, Message):
+        raise TypeError("{} must be a Message: {!r}".format(name, msg))
+    return msg
+
+
+def _check_optional_message(msg: Message, name: str) -> Message:
+    """Return msg if it is None or a Message instance.
+
+    Raises:
+        TypeError: If msg is neither None nor a Message.
+    """
+    if msg is None:
+        return None
+    return _check_message(msg, name)
+
+
 class ConfigError:
     """Error codes shown on the display when MidiController detects a
     problem it can't safely continue from."""
@@ -34,64 +56,111 @@ class ConfigError:
     QUEUE_OVERFLOW = 4
     STOMP_UNCONFIGURED = 5
     SNAP_DEFAULT = 6
+    LOOPER_UNCONFIGURED = 7
 
 
 class MidiMap:
-    """MIDI channel, CC numbers and message values. The stomp CCs are
-    optional and default to None (unassigned)."""
+    """The Message sent for each controller event. Any Message subclass
+    may be used (e.g. ControlChange, ProgramChange); each carries its own
+    channel. Looper messages are optional, and each stomp has an optional
+    on and off message; unset entries default to None (unassigned)."""
 
     CHANNEL: int
-    SNAP_CC: int
-    SNAP_MODE_VAL: int
-    PRESET_CC: int
-    PRESET_UP_VAL: int
-    PRESET_DOWN_VAL: int
-    PRESET_MODE_VAL: int
-    LOOPER_CC: int
-    LOOPER_RO_VAL: int
-    LOOPER_SP_VAL: int
-    LOOPER_UNDO_VAL: int
-    LOOPER_CLEAR_VAL: int
-    STOMP_1_CC: int
-    STOMP_2_CC: int
-    STOMP_3_CC: int
-    STOMP_4_CC: int
+    SNAP: tuple
+    SNAP_MODE: Message
+    PRESET_UP: Message
+    PRESET_DOWN: Message
+    PRESET_MODE: Message
+    LOOPER_RO: Message
+    LOOPER_SP: Message
+    LOOPER_UNDO: Message
+    LOOPER_CLEAR: Message
+    STOMP_ON: tuple
+    STOMP_OFF: tuple
 
     def __init__(
         self,
         channel: int,
-        snap_cc: int,
-        snap_mode_val: int,
-        preset_cc: int,
-        preset_up_val: int,
-        preset_down_val: int,
-        preset_mode_val: int,
-        looper_cc: int,
-        looper_ro_val: int,
-        looper_sp_val: int,
-        looper_undo_val: int,
-        looper_clear_val: int,
-        stomp_1_cc: int = None,
-        stomp_2_cc: int = None,
-        stomp_3_cc: int = None,
-        stomp_4_cc: int = None,
+        snap_1: Message,
+        snap_2: Message,
+        snap_3: Message,
+        snap_4: Message,
+        snap_5: Message,
+        snap_6: Message,
+        snap_7: Message,
+        snap_8: Message,
+        snap_mode: Message,
+        preset_up: Message,
+        preset_down: Message,
+        preset_mode: Message,
+        looper_ro: Message = None,
+        looper_sp: Message = None,
+        looper_undo: Message = None,
+        looper_clear: Message = None,
+        stomp_1_on: Message = None,
+        stomp_1_off: Message = None,
+        stomp_2_on: Message = None,
+        stomp_2_off: Message = None,
+        stomp_3_on: Message = None,
+        stomp_3_off: Message = None,
+        stomp_4_on: Message = None,
+        stomp_4_off: Message = None,
     ):
+        """
+        Args:
+            channel (int): Default MIDI channel (0-15) for value
+                targets. Other entries use their own channel.
+            snap_1 .. snap_8 (Message): Sent for each snap.
+            snap_mode (Message): Sent before a snap when mode messages
+                are enabled.
+            preset_up, preset_down, preset_mode (Message): Sent for
+                preset up, preset down and preset mode.
+            looper_ro, looper_sp, looper_undo, looper_clear (Message,
+                optional): Sent for record/overdub, stop/play, undo and
+                clear.
+            stomp_1_on .. stomp_4_on (Message, optional): Sent when the
+                stomp is switched on.
+            stomp_1_off .. stomp_4_off (Message, optional): Sent when
+                the stomp is switched off.
+
+        Raises:
+            TypeError: If any entry is not a Message (or None for
+                optional entries).
+            ValueError: If only one of a stomp's on and off messages is
+                given.
+        """
         self.CHANNEL = _clamp_channel(channel)
-        self.SNAP_CC = _clamp_byte(snap_cc)
-        self.SNAP_MODE_VAL = _clamp_byte(snap_mode_val)
-        self.PRESET_CC = _clamp_byte(preset_cc)
-        self.PRESET_UP_VAL = _clamp_byte(preset_up_val)
-        self.PRESET_DOWN_VAL = _clamp_byte(preset_down_val)
-        self.PRESET_MODE_VAL = _clamp_byte(preset_mode_val)
-        self.LOOPER_CC = _clamp_byte(looper_cc)
-        self.LOOPER_RO_VAL = _clamp_byte(looper_ro_val)
-        self.LOOPER_SP_VAL = _clamp_byte(looper_sp_val)
-        self.LOOPER_UNDO_VAL = _clamp_byte(looper_undo_val)
-        self.LOOPER_CLEAR_VAL = _clamp_byte(looper_clear_val)
-        self.STOMP_1_CC = _clamp_byte(stomp_1_cc)
-        self.STOMP_2_CC = _clamp_byte(stomp_2_cc)
-        self.STOMP_3_CC = _clamp_byte(stomp_3_cc)
-        self.STOMP_4_CC = _clamp_byte(stomp_4_cc)
+        self.SNAP = (
+            _check_message(snap_1, "snap_1"),
+            _check_message(snap_2, "snap_2"),
+            _check_message(snap_3, "snap_3"),
+            _check_message(snap_4, "snap_4"),
+            _check_message(snap_5, "snap_5"),
+            _check_message(snap_6, "snap_6"),
+            _check_message(snap_7, "snap_7"),
+            _check_message(snap_8, "snap_8"),
+        )
+        self.SNAP_MODE = _check_message(snap_mode, "snap_mode")
+        self.PRESET_UP = _check_message(preset_up, "preset_up")
+        self.PRESET_DOWN = _check_message(preset_down, "preset_down")
+        self.PRESET_MODE = _check_message(preset_mode, "preset_mode")
+        self.LOOPER_RO = _check_optional_message(looper_ro, "looper_ro")
+        self.LOOPER_SP = _check_optional_message(looper_sp, "looper_sp")
+        self.LOOPER_UNDO = _check_optional_message(looper_undo, "looper_undo")
+        self.LOOPER_CLEAR = _check_optional_message(looper_clear, "looper_clear")
+
+        stomp_on = (stomp_1_on, stomp_2_on, stomp_3_on, stomp_4_on)
+        stomp_off = (stomp_1_off, stomp_2_off, stomp_3_off, stomp_4_off)
+        for index in range(4):
+            name = "stomp_{}".format(index + 1)
+            _check_optional_message(stomp_on[index], name + "_on")
+            _check_optional_message(stomp_off[index], name + "_off")
+            if (stomp_on[index] is None) != (stomp_off[index] is None):
+                raise ValueError(
+                    "{} needs both an on and an off message".format(name)
+                )
+        self.STOMP_ON = stomp_on
+        self.STOMP_OFF = stomp_off
 
 
 class PatternMap:
@@ -191,7 +260,7 @@ class SnapManager:
     ):
         """
         Args:
-            midi_map (MidiMap): MIDI channel and CC configuration.
+            midi_map (MidiMap): MIDI message configuration.
             pattern_map (PatternMap): LED patterns to use.
             default_snap (int, optional): Snap (1-8) selected at start-up
                 and by reset(). Defaults to 1.
@@ -205,12 +274,6 @@ class SnapManager:
         self.midi_map = midi_map
         self.pattern_map = pattern_map
         self._default_snap = default_snap
-
-        self._snap_mode_msg = ControlChange(
-            channel=midi_map.CHANNEL,
-            controller=midi_map.SNAP_CC,
-            value=midi_map.SNAP_MODE_VAL,
-        )
 
         # Active pattern for each snap, indexed by snap number - 1.
         self._active_patterns = (
@@ -248,15 +311,11 @@ class SnapManager:
 
         self._value = self._BASE_VALUE[control_action] + secondary
 
-    def snap_mode_msg(self) -> ControlChange:
-        return self._snap_mode_msg
+    def snap_mode_msg(self) -> Message:
+        return self.midi_map.SNAP_MODE
 
-    def msg(self) -> ControlChange:
-        return ControlChange(
-            channel=self.midi_map.CHANNEL,
-            controller=self.midi_map.SNAP_CC,
-            value=self._value,
-        )
+    def msg(self) -> Message:
+        return self.midi_map.SNAP[self._value - 1]
 
     def value(self) -> int:
         return self._value
@@ -281,24 +340,18 @@ class PresetManager:
         self.midi_map = midi_map
         self.preset_num = max(1, preset_num)
         self._value = max(1, min(self.preset_num, initial))
-        self._msg_value = midi_map.PRESET_UP_VAL
+        self._msg = midi_map.PRESET_UP
 
-        self._preset_mode_msg = ControlChange(
-            channel=midi_map.CHANNEL,
-            controller=midi_map.PRESET_CC,
-            value=midi_map.PRESET_MODE_VAL,
-        )
-
-    def preset_mode_msg(self):
-        return self._preset_mode_msg
+    def preset_mode_msg(self) -> Message:
+        return self.midi_map.PRESET_MODE
 
     def exec_action(self, control_action: ControlAction):
         """Updates the preset number. Retrieve the resulting message via
         msg()."""
         if control_action == ControlAction.PRESET_UP:
-            delta, self._msg_value = 1, self.midi_map.PRESET_UP_VAL
+            delta, self._msg = 1, self.midi_map.PRESET_UP
         else:
-            delta, self._msg_value = -1, self.midi_map.PRESET_DOWN_VAL
+            delta, self._msg = -1, self.midi_map.PRESET_DOWN
 
         self._value += delta
         # Wrap around 1 and the maximum
@@ -307,12 +360,8 @@ class PresetManager:
         elif self._value > self.preset_num:
             self._value = 1
 
-    def msg(self) -> ControlChange:
-        return ControlChange(
-            channel=self.midi_map.CHANNEL,
-            controller=self.midi_map.PRESET_CC,
-            value=self._msg_value,
-        )
+    def msg(self) -> Message:
+        return self._msg
 
     def value(self) -> int:
         return self._value
@@ -345,8 +394,28 @@ class LooperManager:
         self.midi_map = midi_map
         self.pattern_map = pattern_map
         self.state = self._EMPTY
-        self._msg_value = midi_map.LOOPER_UNDO_VAL
+        self._msg = midi_map.LOOPER_UNDO
         self._text = self._TXT_STOP
+
+    def _message_for(self, control_action: ControlAction) -> Message:
+        """MidiMap message for a looper action, or None if unassigned."""
+        if control_action == ControlAction.LOOPER_REC_OD:
+            return self.midi_map.LOOPER_RO
+        if control_action == ControlAction.LOOPER_STOP_PLAY:
+            return self.midi_map.LOOPER_SP
+        if control_action == ControlAction.LOOPER_CLEAR:
+            return self.midi_map.LOOPER_CLEAR
+        if control_action == ControlAction.LOOPER_UNDO:
+            return self.midi_map.LOOPER_UNDO
+        raise ValueError("not a looper action: {!r}".format(control_action))
+
+    def is_assigned(self, control_action: ControlAction) -> bool:
+        """True if the looper action has a message in the MidiMap.
+
+        Raises:
+            ValueError: If control_action is not a looper action.
+        """
+        return self._message_for(control_action) is not None
 
     def exec_action(self, control_action: ControlAction):
         """Advances the state machine. Retrieve the resulting message via
@@ -360,7 +429,7 @@ class LooperManager:
                 self.state = self._OVERDUBBING
             elif self.state == self._OVERDUBBING:
                 self.state = self._PLAYING
-            self._msg_value = self.midi_map.LOOPER_RO_VAL
+            self._msg = self.midi_map.LOOPER_RO
             if self.state == self._RECORDING:
                 self._text = self._TXT_REC
             elif self.state == self._OVERDUBBING:
@@ -377,26 +446,29 @@ class LooperManager:
                 self.state = self._STOPPED
             elif self.state == self._STOPPED:
                 self.state = self._PLAYING
-            self._msg_value = self.midi_map.LOOPER_SP_VAL
+            self._msg = self.midi_map.LOOPER_SP
             self._text = (
                 self._TXT_PLAY if self.state == self._PLAYING else self._TXT_STOP
             )
 
         elif control_action == ControlAction.LOOPER_CLEAR:
             self.state = self._EMPTY
-            self._msg_value = self.midi_map.LOOPER_CLEAR_VAL
+            self._msg = self.midi_map.LOOPER_CLEAR
             self._text = self._TXT_CLEAR
 
         else:  # ControlAction.LOOPER_UNDO -- does not change the transport state.
-            self._msg_value = self.midi_map.LOOPER_UNDO_VAL
+            self._msg = self.midi_map.LOOPER_UNDO
             self._text = self._TXT_UNDO
 
-    def msg(self) -> ControlChange:
-        return ControlChange(
-            channel=self.midi_map.CHANNEL,
-            controller=self.midi_map.LOOPER_CC,
-            value=self._msg_value,
-        )
+    def msg(self) -> Message:
+        """Message for the most recent looper action.
+
+        Raises:
+            ValueError: If that action has no message assigned.
+        """
+        if self._msg is None:
+            raise ValueError("looper action has no message assigned")
+        return self._msg
 
     def display_str(self) -> str:
         """Label for the latest loop command: "rEC ", "PLAY", "OdUb",
@@ -418,10 +490,7 @@ class LooperManager:
 
 class StompManager:
     """Four independent on/off stomps. Each press toggles one stomp and
-    sends its state as a CC value (127 on, 0 off)."""
-
-    ON_VALUE = 127
-    OFF_VALUE = 0
+    sends its on or off message."""
 
     _ACTIONS = (
         ControlAction.STOMP_1,
@@ -445,12 +514,6 @@ class StompManager:
         self.midi_map = midi_map
         self.pattern_map = pattern_map
 
-        self._ccs = (
-            midi_map.STOMP_1_CC,
-            midi_map.STOMP_2_CC,
-            midi_map.STOMP_3_CC,
-            midi_map.STOMP_4_CC,
-        )
         self._active_patterns = (
             pattern_map.STOMP_1,
             pattern_map.STOMP_2,
@@ -476,13 +539,13 @@ class StompManager:
         self._states[index] = not self._states[index]
         self._last = index
 
-    def cc(self, control_action: ControlAction) -> int:
-        """CC number assigned to a stomp, or None if unassigned.
+    def is_assigned(self, control_action: ControlAction) -> bool:
+        """True if the stomp has on and off messages in the MidiMap.
 
         Raises:
             ValueError: If control_action is not a stomp action.
         """
-        return self._ccs[self._index(control_action)]
+        return self.midi_map.STOMP_ON[self._index(control_action)] is not None
 
     def is_on(self, control_action: ControlAction) -> bool:
         """True if the stomp is on.
@@ -492,20 +555,19 @@ class StompManager:
         """
         return self._states[self._index(control_action)]
 
-    def msg(self) -> ControlChange:
-        """CC message for the most recently toggled stomp.
+    def msg(self) -> Message:
+        """On or off message for the most recently toggled stomp.
 
         Raises:
-            ValueError: If that stomp has no CC assigned.
+            ValueError: If that stomp has no messages assigned.
         """
-        cc = self._ccs[self._last]
-        if cc is None:
-            raise ValueError("stomp {} has no CC assigned".format(self._last + 1))
-        return ControlChange(
-            channel=self.midi_map.CHANNEL,
-            controller=cc,
-            value=self.ON_VALUE if self._states[self._last] else self.OFF_VALUE,
-        )
+        if self._states[self._last]:
+            msg = self.midi_map.STOMP_ON[self._last]
+        else:
+            msg = self.midi_map.STOMP_OFF[self._last]
+        if msg is None:
+            raise ValueError("stomp {} has no message assigned".format(self._last + 1))
+        return msg
 
     def display_str(self) -> str:
         """"t", the stomp number, a space and the state (1 on, 0 off),
