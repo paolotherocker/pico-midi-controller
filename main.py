@@ -9,7 +9,7 @@ from machine import Pin
 from utils.neopixelmanager import NeoPixelManager, Pulse, Solid, Off, Wave
 import time
 from tm1637 import TM1637
-from utils.midi import MidiUsb
+from utils.midi import MidiUsb, ControlChange, ProgramChange
 from midi_controller import MidiController, MidiMap, PatternMap, ValueParam
 from control_hardware import ControlButton, ControlEncoder, ControlAction, LEDMode
 
@@ -35,19 +35,34 @@ P_MENU_BUTTONS = [10, 11]
 # USB MIDI device name shown on the host
 MIDI_PRODUCT_STR = "Pico Midi Controller"
 
+# Each entry is any Message (e.g. ControlChange, ProgramChange) and carries
+# its own channel. The channel argument is the default for value targets.
 MIDI_MAP = MidiMap(
     channel=0,
-    snap_cc=24,
-    snap_mode_val=0,
-    preset_cc=20,
-    preset_up_val=1,
-    preset_down_val=2,
-    preset_mode_val=0,
-    looper_cc=25,
-    looper_ro_val=1,
-    looper_sp_val=2,
-    looper_clear_val=3,
-    looper_undo_val=4,
+    snap_1=ControlChange(0, controller=24, value=1),
+    snap_2=ControlChange(0, controller=24, value=2),
+    snap_3=ControlChange(0, controller=24, value=3),
+    snap_4=ControlChange(0, controller=24, value=4),
+    snap_5=ControlChange(0, controller=24, value=5),
+    snap_6=ControlChange(0, controller=24, value=6),
+    snap_7=ControlChange(0, controller=24, value=7),
+    snap_8=ControlChange(0, controller=24, value=8),
+    snap_mode=ControlChange(0, controller=24, value=0),
+    preset_up=ControlChange(0, controller=20, value=1),
+    preset_down=ControlChange(0, controller=20, value=2),
+    preset_mode=ControlChange(0, controller=20, value=0),
+    looper_ro=ControlChange(0, controller=25, value=1),
+    looper_sp=ControlChange(0, controller=25, value=2),
+    looper_clear=ControlChange(0, controller=25, value=3),
+    looper_undo=ControlChange(0, controller=25, value=4),
+    stomp_1_on=ControlChange(0, controller=26, value=127),
+    stomp_1_off=ControlChange(0, controller=26, value=0),
+    stomp_2_on=ControlChange(0, controller=27, value=127),
+    stomp_2_off=ControlChange(0, controller=27, value=0),
+    stomp_3_on=ControlChange(0, controller=28, value=127),
+    stomp_3_off=ControlChange(0, controller=28, value=0),
+    stomp_4_on=ControlChange(0, controller=29, value=127),
+    stomp_4_off=ControlChange(0, controller=29, value=0),
 )
 
 PATTERN_MAP = PatternMap(
@@ -65,6 +80,10 @@ PATTERN_MAP = PatternMap(
     looper_playing=Wave((3, 3, 0), (30, 30, 0), period_ms=2000, spread=1),  # Yellow
     looper_recording=Wave((6, 0, 0), (60, 0, 0), period_ms=2000, spread=1),  # Red
     looper_overdubbing=Wave((6, 0, 0), (60, 0, 0), period_ms=2000, spread=1),  # Red
+    stomp_1=Solid((0, 50, 0)),  # Green
+    stomp_2=Solid((50, 25, 0)),  # Amber
+    stomp_3=Solid((0, 40, 40)),  # Cyan
+    stomp_4=Solid((40, 0, 40)),  # Magenta
 )
 
 CONTROLS_MAP = [
@@ -83,7 +102,10 @@ LED_MAP = [
 ]
 
 # Send a mode message every time a snap message is sent
-SEND_MODE_MSG = True
+SEND_MODE_MSG = False
+
+# Snap (1-8) active at start-up and after every preset change
+DEFAULT_SNAP = 5
 
 # Rotary encoder value targets
 VALUE_PARAMS = [
@@ -151,6 +173,7 @@ midi_controller = MidiController(
     control_encoder=control_encoder,
     value_params=VALUE_PARAMS,
     display_hang_ms=DISPLAY_HANG_MS,
+    default_snap=DEFAULT_SNAP,
 )
 
 while True:
